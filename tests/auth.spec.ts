@@ -48,36 +48,42 @@ test.describe("signed out", () => {
 		expect(body.message).toBe("An account already exists. Please login instead.");
 	});
 
-	test("direct sign-in is limited per account email with a generic 429", async ({ request }) => {
-		const email = `limited-${Date.now()}@example.com`;
+	test("direct sign-in is limited per client IP, and another IP can still sign in", async ({ request }) => {
+		const blockedIp = { ...originHeaders, "CF-Connecting-IP": "198.51.100.77" };
 		for (let attempt = 1; attempt <= 10; attempt++) {
 			const response = await request.post("/api/auth/sign-in/email", {
-				headers: { ...originHeaders, "CF-Connecting-IP": `192.0.2.${attempt}` },
+				headers: blockedIp,
+				data: { email: credentials.email, password: "not-the-password" },
+			});
+			expect(response.status(), `attempt ${attempt}`).toBe(401);
+		}
+		const limited = await request.post("/api/auth/sign-in/email", {
+			headers: blockedIp,
+			data: { email: credentials.email, password: credentials.password },
+		});
+		expect(limited.status()).toBe(429);
+		expect(Number(limited.headers()["retry-after"])).toBeGreaterThan(0);
+		expect((await limited.json()).code).toBe("TOO_MANY_REQUESTS");
+
+		const otherIp = await request.post("/api/auth/sign-in/email", {
+			headers: { ...originHeaders, "CF-Connecting-IP": "198.51.100.78" },
+			data: { email: credentials.email, password: credentials.password },
+		});
+		expect(otherIp.status()).toBe(200);
+	});
+
+	test("an account email has a high backstop limit across IPs", async ({ request }) => {
+		const email = `backstop-${Date.now()}@example.com`;
+		for (let attempt = 1; attempt <= 100; attempt++) {
+			const response = await request.post("/api/auth/sign-in/email", {
+				headers: { ...originHeaders, "CF-Connecting-IP": `10.0.0.${attempt}` },
 				data: { email, password: "not-the-password" },
 			});
 			expect(response.status(), `attempt ${attempt}`).toBe(401);
 		}
 		const limited = await request.post("/api/auth/sign-in/email", {
-			headers: { ...originHeaders, "CF-Connecting-IP": "192.0.2.11" },
+			headers: { ...originHeaders, "CF-Connecting-IP": "10.0.1.1" },
 			data: { email, password: "not-the-password" },
-		});
-		expect(limited.status()).toBe(429);
-		expect(Number(limited.headers()["retry-after"])).toBeGreaterThan(0);
-		expect(await limited.json()).toEqual({ code: "TOO_MANY_REQUESTS", message: "Too many attempts. Please try again later." });
-	});
-
-	test("direct sign-in is limited per client IP", async ({ request }) => {
-		const headers = { ...originHeaders, "CF-Connecting-IP": "198.51.100.77" };
-		for (let attempt = 1; attempt <= 20; attempt++) {
-			const response = await request.post("/api/auth/sign-in/email", {
-				headers,
-				data: { email: `ip-${attempt}-${Date.now()}@example.com`, password: "not-the-password" },
-			});
-			expect(response.status(), `attempt ${attempt}`).toBe(401);
-		}
-		const limited = await request.post("/api/auth/sign-in/email", {
-			headers,
-			data: { email: credentials.email, password: credentials.password },
 		});
 		expect(limited.status()).toBe(429);
 	});
