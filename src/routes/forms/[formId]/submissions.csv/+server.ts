@@ -8,12 +8,13 @@ import type { RequestHandler } from './$types';
 export const GET: RequestHandler = async ({ params }) => {
 	requireUser();
 	if (!(await getForm(params.formId))) error(404, 'Form not found');
-	const csv = await submissionsCsv(env.DB, params.formId);
+	const { stream, truncated } = await submissionsCsv(env.DB, params.formId);
 	const filename = `submissions-${new Date().toISOString().split('T')[0]}.csv`;
-	return new Response(csv, {
+	return new Response(stream, {
 		headers: {
 			'Content-Type': 'text/csv; charset=utf-8',
-			'Content-Disposition': `attachment; filename="${filename}"`
+			'Content-Disposition': `attachment; filename="${filename}"`,
+			...(truncated ? { 'X-Export-Truncated': 'true' } : {})
 		}
 	});
 };

@@ -509,7 +509,7 @@ test("invalid stored rows can be searched and sorted by email", async ({ page })
 	await expect(page.getByText("6 total submission(s)")).toBeVisible();
 });
 
-test("CSV export streams in batches and stops at 100,000 rows", async () => {
+test("CSV export streams in batches and stops at 100,000 rows", async ({ browser }) => {
 	const formId = createForm("CSV Cap");
 	d1(
 		`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 100001)
@@ -518,6 +518,7 @@ test("CSV export streams in batches and stops at 100,000 rows", async () => {
 	const owner = await authedRequest();
 	const response = await owner.get(`/forms/${formId}/submissions.csv`, { timeout: 120_000 });
 	expect(response.status()).toBe(200);
+	expect(response.headers()["x-export-truncated"]).toBe("true");
 	const lines = (await response.text()).split("\n");
 	await owner.dispose();
 
@@ -527,6 +528,16 @@ test("CSV export streams in batches and stops at 100,000 rows", async () => {
 	expect(lines[1000]).toBe(`cap-099002,${new Date(99002).toISOString()},99002`);
 	expect(lines[1001]).toBe(`cap-099001,${new Date(99001).toISOString()},99001`);
 	expect(lines.at(-1)).toBe(`cap-000002,${new Date(2).toISOString()},2`);
+
+	const page = await browser.newPage({ storageState: storageStatePath });
+	await page.goto(`/forms/${formId}/submissions`);
+	await expect(page.getByText("Showing the newest 100,000 of 100,001")).toBeVisible();
+	await page.close();
+
+	const small = await authedRequest();
+	const normal = await small.get(`/forms/${firstForm.id}/submissions.csv`);
+	expect(normal.headers()["x-export-truncated"]).toBeUndefined();
+	await small.dispose();
 });
 
 test("stored values that cannot be turned into text with String() still render and export", async ({ page }) => {

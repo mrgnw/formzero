@@ -54,16 +54,23 @@
 			onDelete={(submission) => (pendingDelete = submission)}
 		>
 			{#snippet toolbar()}
-				<Button
-					variant="outline"
-					size="sm"
-					href="/forms/{data.form.id}/submissions.csv"
-					download
-					class="h-9 gap-1.5 text-xs"
-				>
-					<Download class="size-3" aria-hidden="true" />
-					Export CSV
-				</Button>
+				<div class="flex items-center gap-2">
+					{#if data.stats.total > data.csvLimit}
+						<p class="text-xs text-muted-foreground">
+							Showing the newest {data.csvLimit.toLocaleString('en-US')} of {data.stats.total.toLocaleString('en-US')}
+						</p>
+					{/if}
+					<Button
+						variant="outline"
+						size="sm"
+						href="/forms/{data.form.id}/submissions.csv"
+						download
+						class="h-9 gap-1.5 text-xs"
+					>
+						<Download class="size-3" aria-hidden="true" />
+						Export CSV
+					</Button>
+				</div>
 			{/snippet}
 		</SubmissionsTable>
 	{/if}
