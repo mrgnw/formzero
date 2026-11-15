@@ -1,5 +1,5 @@
 import type { Route } from "./+types/forms.$formId"
-import { Outlet, redirect, useLoaderData, useLocation, useParams } from "react-router";
+import { data, Outlet, redirect, useLoaderData, useLocation, useParams } from "react-router";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -32,6 +32,10 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
     .prepare("SELECT id, name FROM forms WHERE id = ?")
     .bind(params.formId)
     .first()
+
+  if (!result) {
+    throw data("Form not found", { status: 404 })
+  }
 
   // If we're at exactly /forms/:formId (with or without trailing slash), redirect to submissions
   const url = new URL(request.url)
