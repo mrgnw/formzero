@@ -154,6 +154,12 @@ test("the success and error pages render", async ({ page }) => {
 	await expect(page.getByRole("heading", { name: "Form Not Found" })).toBeVisible();
 });
 
+test("an unknown URL renders the 404 page", async ({ page }) => {
+	const response = await page.goto("/no-such-page");
+	expect(response?.status()).toBe(404);
+	await expect(page.getByRole("heading", { name: "404" })).toBeVisible();
+});
+
 test.describe("result pages", () => {
 	test("/success confirms the submission", async ({ page }) => {
 		await page.goto("/success");
