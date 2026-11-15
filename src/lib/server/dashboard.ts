@@ -22,6 +22,7 @@ export type SubmissionPage = {
 };
 
 export const PAGE_SIZE = 50;
+export const MAX_QUERY_LENGTH = 200;
 export const CSV_BATCH_SIZE = 1000;
 export const CSV_MAX_ROWS = 100_000;
 
@@ -47,7 +48,7 @@ const ORDER_BY: Record<SortKey, Record<Direction, string>> = {
 type Row = Omit<Submission, 'data'> & { data: string };
 
 export function parseSort(param: string | null): Sort {
-	return SORTS[param ?? ''] ?? SORTS['-time'];
+	return param !== null && Object.hasOwn(SORTS, param) ? SORTS[param] : SORTS['-time'];
 }
 
 export function parsePage(param: string | null) {
@@ -87,22 +88,22 @@ function tableFields(submissions: Submission[]) {
 	});
 }
 
-function likePattern(query: string) {
-	return `%${query.replace(/[\\%_]/g, '\\$&')}%`;
-}
-
 export async function listSubmissions(formId: string, query: string, sort: Sort, page: number): Promise<SubmissionPage> {
-	const search = query ? " AND (data LIKE ?2 ESCAPE '\\' OR id LIKE ?2 ESCAPE '\\')" : '';
-	const params = query ? [formId, likePattern(query)] : [formId];
-	const [rows, count] = await env.DB.batch<Row | { matching: number }>([
-		env.DB.prepare(
-			`SELECT id, form_id, data, created_at FROM submissions WHERE form_id = ?1${search}
-			ORDER BY ${ORDER_BY[sort.key][sort.direction]} LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}`
-		).bind(...params),
-		env.DB.prepare(`SELECT COUNT(*) AS matching FROM submissions WHERE form_id = ?1${search}`).bind(...params)
-	]);
-	const matching = (count.results[0] as { matching: number }).matching;
-	const submissions = (rows.results as Row[]).map(toSubmission);
+	const search = query ? ' AND (instr(lower(data), lower(?2)) > 0 OR instr(lower(id), lower(?2)) > 0)' : '';
+	const params = query ? [formId, query] : [formId];
+	const count = await env.DB.prepare(`SELECT COUNT(*) AS matching FROM submissions WHERE form_id = ?1${search}`)
+		.bind(...params)
+		.first<{ matching: number }>();
+	const matching = count?.matching ?? 0;
+	const pageCount = Math.max(1, Math.ceil(matching / PAGE_SIZE));
+	const offset = (Math.min(page, pageCount) - 1) * PAGE_SIZE;
+	const rows = await env.DB.prepare(
+		`SELECT id, form_id, data, created_at FROM submissions WHERE form_id = ?1${search}
+		ORDER BY ${ORDER_BY[sort.key][sort.direction]} LIMIT ${PAGE_SIZE} OFFSET ${offset}`
+	)
+		.bind(...params)
+		.all<Row>();
+	const submissions = rows.results.map(toSubmission);
 	const fields = tableFields(submissions);
 	return {
 		fields,
@@ -114,7 +115,7 @@ export async function listSubmissions(formId: string, query: string, sort: Sort,
 		})),
 		matching,
 		page,
-		pageCount: Math.max(1, Math.ceil(matching / PAGE_SIZE))
+		pageCount
 	};
 }
 
