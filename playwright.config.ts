@@ -14,7 +14,8 @@ export default defineConfig({
 	reporter: [["list"]],
 	use: { baseURL },
 	projects: [
-		{ name: "setup", testMatch: /auth\.setup\.ts/ },
+		{ name: "first-owner", testMatch: /first-owner\.setup\.ts/ },
+		{ name: "setup", testMatch: /auth\.setup\.ts/, dependencies: ["first-owner"] },
 		{ name: "unit", testMatch: /(stats|csv)\.spec\.ts/ },
 		{ name: "dashboard", testMatch: /dashboard\.spec\.ts/, dependencies: ["setup"], use: signedIn },
 		{ name: "auth", testMatch: /auth\.spec\.ts/, dependencies: ["setup"], use: signedIn },
