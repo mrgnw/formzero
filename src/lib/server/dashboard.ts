@@ -25,7 +25,16 @@ export async function listSubmissions(formId: string): Promise<Submission[]> {
 	)
 		.bind(formId)
 		.all<Omit<Submission, 'data'> & { data: string }>();
-	return results.map((row) => ({ ...row, data: JSON.parse(row.data) }));
+	return results.map((row) => ({ ...row, data: parseData(row.data) }));
+}
+
+export function parseData(text: string): Record<string, unknown> {
+	try {
+		const data: unknown = JSON.parse(text);
+		return data !== null && typeof data === 'object' && !Array.isArray(data) ? (data as Record<string, unknown>) : {};
+	} catch {
+		return {};
+	}
 }
 
 export async function deleteSubmission(formId: string, id: string) {

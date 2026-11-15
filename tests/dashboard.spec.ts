@@ -1,5 +1,5 @@
 import { type Page, expect, request as playwrightRequest, test } from "@playwright/test";
-import { authedRequest, credentials, d1, emptyStorageState, firstForm, origin, originHeaders, postSubmission, storageStatePath } from "./support";
+import { authedRequest, createForm, credentials, d1, emptyStorageState, firstForm, origin, originHeaders, postSubmission, storageStatePath } from "./support";
 
 test.describe.configure({ mode: "serial" });
 
@@ -390,4 +390,29 @@ test("delete a form with type-to-confirm", async ({ page }) => {
 	await expect(page).toHaveURL(/\/forms\/contact-form\/submissions$/);
 	await page.getByRole("button", { name: /Contact Us/ }).click();
 	await expect(page.getByRole("menuitem", { name: secondForm.name })).toHaveCount(0);
+});
+
+test("stored rows that are not JSON objects never break the page or the CSV", async ({ page }) => {
+	const formId = createForm("Invalid Rows");
+	const rows = ["null", "[1,2]", "5", '"text"', "not json", '{"email":"valid@example.com"}'];
+	d1(
+		`INSERT INTO submissions (id, form_id, data, created_at) VALUES ${rows
+			.map((data, index) => `('bad-${index}', '${formId}', '${data}', ${1700000000000 + index})`)
+			.join(", ")}`,
+	);
+
+	const response = await page.goto(`/forms/${formId}/submissions`);
+	expect(response?.status()).toBe(200);
+	await expect(page.getByText(`${rows.length} total submission(s)`)).toBeVisible();
+	await expect(page.getByRole("cell", { name: "valid@example.com" })).toBeVisible();
+
+	const owner = await authedRequest();
+	const csv = await owner.get(`/forms/${formId}/submissions.csv`);
+	expect(csv.status()).toBe(200);
+	const lines = (await csv.text()).split("\n");
+	expect(lines[0]).toBe("ID,Created At,email");
+	expect(lines.slice(1)).toEqual(
+		rows.map((_, index) => `bad-${index},${new Date(1700000000000 + index).toISOString()},${index === 5 ? "valid@example.com" : ""}`).reverse(),
+	);
+	await owner.dispose();
 });
