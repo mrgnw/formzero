@@ -18,7 +18,6 @@ export default [
   route("settings/notifications", "routes/settings.notifications.tsx"),
   route("settings/notifications/test", "routes/settings.notifications.test.tsx"),
 
-  route("/api/auth/*", "routes/api.auth.$.tsx"),
   route("/api/forms/:formId/submissions", "routes/api.forms.$formId.submissions.tsx"),
 
   route("/success", "routes/success.tsx"),

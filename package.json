@@ -73,5 +73,8 @@
 				"description": "Secret for authentication system. Use https://jwtsecrets.com or `openssl rand -hex 16` to generate a secure secret (32 characters). No need to remember it"
 			}
 		}
+	},
+	"imports": {
+		"#lib/*": "./src/lib/*"
 	}
 }

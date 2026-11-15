@@ -47,7 +47,7 @@ test.describe("signed out", () => {
 		});
 		expect(response.status()).toBe(403);
 		const body = await response.json();
-		expect(body.error).toBe("SIGNUP_DISABLED");
+		expect(body.code).toBe("SIGNUP_DISABLED");
 		expect(body.message).toBe("An account already exists. Please login instead.");
 	});
 
