@@ -34,7 +34,7 @@ export function FormNav() {
       title: "Settings",
       url: `/forms/${formId}/settings`,
       icon: Settings,
-      reloadDocument: false,
+      reloadDocument: true,
     },
   ]
 

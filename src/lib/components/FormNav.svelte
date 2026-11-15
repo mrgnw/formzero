@@ -9,7 +9,7 @@
 	const items = $derived([
 		{ title: 'Submissions', url: `/forms/${formId}/submissions`, icon: Database, reload: true },
 		{ title: 'Integration', url: `/forms/${formId}/integration`, icon: Puzzle, reload: false },
-		{ title: 'Settings', url: `/forms/${formId}/settings`, icon: Settings, reload: true }
+		{ title: 'Settings', url: `/forms/${formId}/settings`, icon: Settings, reload: false }
 	]);
 </script>
 
