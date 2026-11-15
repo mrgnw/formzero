@@ -11,18 +11,28 @@ test.afterAll(async () => {
 	await owner.dispose();
 });
 
-test("a cross-origin urlencoded POST /forms is rejected", async () => {
-	const response = await owner.post("/forms", {
-		form: { name: "Forged" },
-		headers: { Origin: "https://attacker.example" },
-		maxRedirects: 0,
+function postForm(headers: Record<string, string>) {
+	return owner.post("/forms", { form: { name: "CSRF Probe" }, headers, maxRedirects: 0 });
+}
+
+for (const [label, value] of [
+	["a mismatched", "https://attacker.example"],
+	["a null", "null"],
+]) {
+	test(`POST /forms with ${label} Origin is rejected`, async () => {
+		const response = await postForm({ Origin: value });
+		expect(response.status()).toBe(403);
 	});
-	expect(response.status()).toBe(403);
+}
+
+test("POST /forms without an Origin header is allowed", async () => {
+	const response = await postForm({});
+	expect(response.status()).toBe(302);
 });
 
-test("a POST /forms without an Origin header is rejected", async () => {
-	const response = await owner.post("/forms", { form: { name: "Forged" }, maxRedirects: 0 });
-	expect(response.status()).toBe(403);
+test("POST /forms with a matching Origin is allowed", async () => {
+	const response = await postForm({ Origin: origin });
+	expect(response.status()).toBe(302);
 });
 
 test("a cross-origin POST to the public API is accepted", async () => {
