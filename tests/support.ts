@@ -38,7 +38,7 @@ export async function createForm(request: APIRequestContext, name: string) {
 export async function postSubmission(request: APIRequestContext, formId: string, data: Record<string, string>) {
 	const response = await request.post(submissionPath(formId), { data });
 	expect(response.status()).toBe(201);
-	await new Promise((resolve) => setTimeout(resolve, 5));
+	await new Promise((resolve) => setTimeout(resolve, 1100));
 }
 
 export function d1(sql: string): Record<string, unknown>[] {
