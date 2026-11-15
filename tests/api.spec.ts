@@ -1,5 +1,5 @@
 import { type APIRequestContext, expect, test } from "@playwright/test";
-import { authedRequest, createForm, emptyStorageState, originHeaders, submissionPath } from "./support";
+import { authedRequest, createForm, d1, emptyStorageState, originHeaders, submissionPath } from "./support";
 
 test.use({ storageState: emptyStorageState });
 
@@ -243,5 +243,56 @@ test.describe("CSV export", () => {
 		const [rowId, createdAt] = row.split(",");
 		expect(rowId).toBe(id);
 		expect(row).toBe(`${id},${createdAt},"'=HYPERLINK(""https://evil.example"",""click"")",'@SUM(A1)`);
+	});
+});
+
+test.describe("rate limits", () => {
+	test("the 31st submission from one IP to one form within a minute is 429 with CORS", async ({ request }) => {
+		const limitedForm = createForm("Rate Limited");
+		const headers = { ...originHeaders, "CF-Connecting-IP": "192.0.2.200" };
+		for (let attempt = 1; attempt <= 30; attempt++) {
+			const response = await post(request, submissionPath(limitedForm), { headers, data: { attempt: String(attempt) } });
+			expect(response.status(), `attempt ${attempt}`).toBe(201);
+		}
+		const limited = await post(request, submissionPath(limitedForm), { headers, data: { attempt: "31" } });
+		expect(limited.status()).toBe(429);
+		expect(Number(limited.headers()["retry-after"])).toBeGreaterThan(0);
+		expect(limited.headers()).toMatchObject(corsHeaders);
+		expect(await limited.json()).toEqual({ success: false, error: "Too many submissions" });
+		expect(d1(`SELECT COUNT(*) AS count FROM submissions WHERE form_id = '${limitedForm}'`)[0].count).toBe(30);
+
+		const otherIp = await post(request, submissionPath(limitedForm), {
+			headers: { ...originHeaders, "CF-Connecting-IP": "192.0.2.201" },
+			data: { attempt: "other" },
+		});
+		expect(otherIp.status()).toBe(201);
+	});
+
+	test("notification sends are counted per form against the hourly cap", async ({ request }) => {
+		const notifiedForm = createForm("Notification Cap");
+		const saved = d1("SELECT * FROM settings");
+		d1(
+			"INSERT OR REPLACE INTO settings (id, notification_email, notification_email_password, smtp_host, smtp_port, smtp_secure, updated_at) VALUES ('global', 'cap@example.org', 'secret', '127.0.0.1', 1, 1, 1700000000000)",
+		);
+		try {
+			for (let attempt = 1; attempt <= 22; attempt++) {
+				const response = await post(request, submissionPath(notifiedForm), {
+					headers: { "CF-Connecting-IP": `192.0.2.${attempt}` },
+					data: { attempt: String(attempt) },
+				});
+				expect(response.status()).toBe(201);
+			}
+			await expect
+				.poll(() => d1(`SELECT count FROM rate_limits WHERE key = 'notify:${notifiedForm}'`)[0]?.count)
+				.toBe(22);
+			expect(d1(`SELECT COUNT(*) AS count FROM submissions WHERE form_id = '${notifiedForm}'`)[0].count).toBe(22);
+		} finally {
+			d1("DELETE FROM settings");
+			for (const row of saved) {
+				const columns = Object.keys(row);
+				const values = columns.map((column) => (row[column] === null ? "NULL" : `'${String(row[column]).replaceAll("'", "''")}'`));
+				d1(`INSERT INTO settings (${columns.join(", ")}) VALUES (${values.join(", ")})`);
+			}
+		}
 	});
 });

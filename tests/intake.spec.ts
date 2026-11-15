@@ -9,11 +9,15 @@ test.beforeAll(() => {
 	d1(`INSERT OR IGNORE INTO forms (id, name, created_at, updated_at) VALUES ('${formId}', 'Intake Limits', 0, 0)`);
 });
 
+let clientNumber = 0;
+
 function post(request: APIRequestContext, options: Parameters<APIRequestContext["post"]>[1], path = submissionPath(formId)) {
+	clientNumber++;
+	const clientIp = `198.18.${Math.floor(clientNumber / 256)}.${clientNumber % 256}`;
 	return request.post(path, {
 		maxRedirects: 0,
 		...options,
-		headers: { ...originHeaders, ...options?.headers },
+		headers: { ...originHeaders, "CF-Connecting-IP": clientIp, ...options?.headers },
 	});
 }
 
