@@ -528,3 +528,39 @@ test("CSV export streams in batches and stops at 100,000 rows", async () => {
 	expect(lines[1001]).toBe(`cap-099001,${new Date(99001).toISOString()},99001`);
 	expect(lines.at(-1)).toBe(`cap-000002,${new Date(2).toISOString()},2`);
 });
+
+test("stored values that cannot be turned into text with String() still render and export", async ({ page }) => {
+	const formId = createForm("Hostile Values");
+	const deep = `${"[".repeat(20_000)}${"]".repeat(20_000)}`;
+	const rows = [
+		'{"email":"a@example.com","field":{"toString":null}}',
+		'{"email":"b@example.com","field":{"valueOf":1}}',
+		'{"toString":null,"valueOf":1}',
+		`{"email":"c@example.com","field":${deep}}`,
+		'{"email":"d@example.com","field":1e400,"other":123456789012345678901234567890}',
+		'{"email":"e@example.com","field":[1,{"x":null}],"other":true}',
+	];
+	d1(
+		`INSERT INTO submissions (id, form_id, data, created_at) VALUES ${rows
+			.map((data, index) => `('hostile-${index}', '${formId}', '${data}', ${1700000000000 + index})`)
+			.join(", ")}`,
+	);
+
+	const response = await page.goto(`/forms/${formId}/submissions`);
+	expect(response?.status()).toBe(200);
+	await expect(page.getByText(`${rows.length} total submission(s)`)).toBeVisible();
+	await expect(page.getByRole("cell", { name: '{"toString":null}' })).toBeVisible();
+	await expect(page.getByRole("cell", { name: '{"valueOf":1}' })).toBeVisible();
+	await expect(page.getByRole("cell", { name: "Infinity" })).toBeVisible();
+	await expect(page.getByRole("cell", { name: '[1,{"x":null}]' })).toBeVisible();
+	expect((await page.goto(`/forms/${formId}/submissions?sort=email`))?.status()).toBe(200);
+
+	const owner = await authedRequest();
+	const csv = await owner.get(`/forms/${formId}/submissions.csv`);
+	expect(csv.status()).toBe(200);
+	const body = await csv.text();
+	await owner.dispose();
+	expect(body.split("\n")).toHaveLength(rows.length + 1);
+	expect(body).toContain('hostile-0,2023-11-14T22:13:20.000Z,a@example.com,"{""toString"":null}"');
+	expect(body).toContain('hostile-4,2023-11-14T22:13:20.004Z,d@example.com,Infinity,1.2345678901234568e+29');
+});

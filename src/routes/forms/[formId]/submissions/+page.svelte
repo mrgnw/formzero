@@ -7,12 +7,12 @@
 	import SubmissionsTable from '#lib/components/SubmissionsTable.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Empty from '#lib/components/ui/empty/index.js';
-	import type { Submission } from '#lib/server/dashboard.js';
+	import type { SubmissionRow } from '#lib/server/dashboard.js';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
-	let pendingDelete = $state<Submission | null>(null);
+	let pendingDelete = $state<SubmissionRow | null>(null);
 </script>
 
 <svelte:head>

@@ -8,7 +8,7 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import * as Table from '#lib/components/ui/table/index.js';
-	import type { Direction, Sort, SortKey, Submission, SubmissionPage } from '#lib/server/dashboard.js';
+	import type { Direction, Sort, SortKey, SubmissionPage, SubmissionRow } from '#lib/server/dashboard.js';
 	import { exactTime, timeAgo } from '#lib/time.js';
 
 	let {
@@ -26,27 +26,16 @@
 		total: number;
 		now: number;
 		toolbar?: Snippet;
-		onDelete: (submission: Submission) => void;
+		onDelete: (submission: SubmissionRow) => void;
 	} = $props();
 
 	const SORT_PARAMS: Record<SortKey, string> = { created_at: 'time', email: 'email' };
 
 	let searchTimer: ReturnType<typeof setTimeout> | undefined;
 
-	const fields = $derived(
-		[...new Set(table.submissions.flatMap((submission) => Object.keys(submission.data)))].sort((a, b) => {
-			if (a === 'email') return -1;
-			if (b === 'email') return 1;
-			return a.localeCompare(b);
-		})
-	);
 	const sortLabel = $derived(sort.key === 'created_at' ? 'Time' : 'Email');
 	const previousPage = $derived(table.page > 1 ? pageHref(table.page - 1) : undefined);
 	const nextPage = $derived(table.page < table.pageCount ? pageHref(table.page + 1) : undefined);
-
-	function text(value: unknown) {
-		return value === undefined || value === null ? '' : String(value);
-	}
 
 	function heading(field: string) {
 		return field.charAt(0).toUpperCase() + field.slice(1);
@@ -118,7 +107,7 @@
 			<Table.Header>
 				<Table.Row>
 					{@render sortableHead('created_at', 'Time')}
-					{#each fields as field (field)}
+					{#each table.fields as field (field)}
 						{#if field === 'email'}
 							{@render sortableHead('email', 'Email')}
 						{:else}
@@ -129,7 +118,7 @@
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
-				{#each table.submissions as submission (submission.id)}
+				{#each table.rows as submission (submission.id)}
 					<Table.Row>
 						<Table.Cell>
 							<time
@@ -140,8 +129,8 @@
 								{timeAgo(submission.created_at, now)}
 							</time>
 						</Table.Cell>
-						{#each fields as field (field)}
-							<Table.Cell>{text(submission.data[field])}</Table.Cell>
+						{#each submission.cells as cell, index (index)}
+							<Table.Cell>{cell}</Table.Cell>
 						{/each}
 						<Table.Cell>
 							<div class="flex justify-end">
@@ -159,7 +148,7 @@
 					</Table.Row>
 				{:else}
 					<Table.Row>
-						<Table.Cell colspan={fields.length + 2} class="h-24 text-center">
+						<Table.Cell colspan={table.fields.length + 2} class="h-24 text-center">
 							No matching submissions.
 						</Table.Cell>
 					</Table.Row>
