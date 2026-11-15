@@ -1,10 +1,20 @@
 import { env, waitUntil } from 'cloudflare:workers';
 import type { EmailConfig } from '#lib/types.js';
 import { sendSubmissionNotification } from './email';
-import { clientIp, hit } from './rate-limit';
+import { clientIp, hit, type RateLimit } from './rate-limit';
 
 export const SUBMISSIONS_PER_IP_PER_MINUTE = 30;
 export const NOTIFICATIONS_PER_FORM_PER_HOUR = 20;
+
+async function hitOrFailOpen(key: string, limit: number, windowSeconds: number): Promise<RateLimit | null> {
+	try {
+		return await hit(key, limit, windowSeconds);
+	} catch (error) {
+		const reason = error instanceof Error ? error.message.slice(0, 200) : 'unknown error';
+		console.error(`Submission rate limiter unavailable, allowing request: ${reason}`);
+		return null;
+	}
+}
 
 export const corsHeaders = {
 	'Access-Control-Allow-Origin': '*',
@@ -152,7 +162,8 @@ async function notify(submission: Submission) {
 		smtp_host: settings.smtp_host,
 		smtp_port: settings.smtp_port
 	};
-	if (!(await hit(`notify:${submission.formId}`, NOTIFICATIONS_PER_FORM_PER_HOUR, 3600)).allowed) return;
+	const cap = await hitOrFailOpen(`notify:${submission.formId}`, NOTIFICATIONS_PER_FORM_PER_HOUR, 3600);
+	if (cap && !cap.allowed) return;
 	await sendSubmissionNotification(config, { ...submission, formName: form.name });
 }
 
@@ -170,8 +181,8 @@ export async function handleSubmission(request: Request, formId: string) {
 			return redirect('/error?error=form_not_found', 302);
 		}
 
-		const limit = await hit(`submit:${clientIp(request)}:${formId}`, SUBMISSIONS_PER_IP_PER_MINUTE, 60);
-		if (!limit.allowed) {
+		const limit = await hitOrFailOpen(`submit:${clientIp(request)}:${formId}`, SUBMISSIONS_PER_IP_PER_MINUTE, 60);
+		if (limit && !limit.allowed) {
 			return Response.json(
 				{ success: false, error: 'Too many submissions' },
 				{ status: 429, headers: { ...corsHeaders, 'Retry-After': String(limit.retryAfter) } }

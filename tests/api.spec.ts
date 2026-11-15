@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { type APIRequestContext, expect, test } from "@playwright/test";
 import { authedRequest, createForm, d1, emptyStorageState, originHeaders, submissionPath } from "./support";
 
@@ -266,6 +267,18 @@ test.describe("rate limits", () => {
 			data: { attempt: "other" },
 		});
 		expect(otherIp.status()).toBe(201);
+	});
+
+	test("submissions are still stored when the rate limiter table is missing", async ({ request }) => {
+		const failOpenForm = createForm("Limiter Down");
+		d1("DROP TABLE rate_limits");
+		try {
+			const response = await post(request, submissionPath(failOpenForm), { data: { name: "Ada" } });
+			expect(response.status()).toBe(201);
+			expect(d1(`SELECT COUNT(*) AS count FROM submissions WHERE form_id = '${failOpenForm}'`)[0].count).toBe(1);
+		} finally {
+			d1(readFileSync("migrations/0005_create_rate_limits.sql", "utf8").replace(/^--.*$/gm, ""));
+		}
 	});
 
 	test("notification sends are counted per form against the hourly cap", async ({ request }) => {
