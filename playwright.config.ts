@@ -1,7 +1,7 @@
 import { defineConfig } from "@playwright/test";
 import { storageStatePath } from "./tests/support";
 
-const port = 5473;
+const port = Number(process.env.E2E_PORT ?? 5473);
 const signedIn = { storageState: storageStatePath };
 const baseURL = `http://localhost:${port}`;
 

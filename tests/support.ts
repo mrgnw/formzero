@@ -3,7 +3,7 @@ import { type APIRequestContext, expect, request as playwrightRequest } from "@p
 
 const persistDir = ".wrangler/e2e";
 
-export const origin = "http://localhost:5473";
+export const origin = `http://localhost:${process.env.E2E_PORT ?? 5473}`;
 
 export const storageStatePath = ".wrangler/e2e-auth.json";
 
