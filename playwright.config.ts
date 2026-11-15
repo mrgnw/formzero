@@ -20,6 +20,7 @@ export default defineConfig({
 		{ name: "auth", testMatch: /auth\.spec\.ts/, dependencies: ["setup"], use: signedIn },
 		{ name: "api", testMatch: /api\.spec\.ts/, dependencies: ["setup"], use: signedIn },
 		{ name: "headers", testMatch: /headers\.spec\.ts/, dependencies: ["setup"], use: signedIn },
+		{ name: "email", testMatch: /email\.spec\.ts/ },
 		{ name: "csrf", testMatch: /csrf\.spec\.ts/, dependencies: ["setup"], use: signedIn },
 		{ name: "intake", testMatch: /intake\.spec\.ts/, dependencies: ["setup"], use: signedIn },
 	],

@@ -9,14 +9,7 @@ export async function sendTestEmail(
 ): Promise<{ success: boolean; error?: string; messageId?: string; failure?: SmtpFailure }> {
   try {
     // Create nodemailer transporter
-    const transporter = nodemailer.createTransport({
-      host: config.smtp_host,
-      port: config.smtp_port,
-      auth: {
-        user: config.notification_email,
-        pass: config.notification_email_password,
-      },
-    })
+    const transporter = nodemailer.createTransport(smtpTransportOptions(config))
 
     // Send test email
     const info = await transporter.sendMail({
@@ -97,6 +90,20 @@ export async function sendTestEmail(
   }
 }
 
+export function smtpTransportOptions(config: EmailConfig) {
+  const implicitTls = config.smtp_port === 465
+  return {
+    host: config.smtp_host,
+    port: config.smtp_port,
+    secure: implicitTls,
+    requireTLS: !implicitTls,
+    auth: {
+      user: config.notification_email,
+      pass: config.notification_email_password,
+    },
+  }
+}
+
 export type SmtpFailure = { code?: string; command?: string; responseCode?: number }
 
 function smtpFailure(error: unknown): SmtpFailure {
@@ -117,14 +124,7 @@ export async function sendSubmissionNotification(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     // Create nodemailer transporter
-    const transporter = nodemailer.createTransport({
-      host: config.smtp_host,
-      port: config.smtp_port,
-      auth: {
-        user: config.notification_email,
-        pass: config.notification_email_password,
-      },
-    })
+    const transporter = nodemailer.createTransport(smtpTransportOptions(config))
 
     // Format the submission data for email display
     const submissionHtml = formatSubmissionData(submission.data)
