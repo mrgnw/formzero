@@ -1,5 +1,5 @@
 import { type APIRequestContext, expect, request as playwrightRequest, test } from "@playwright/test";
-import { firstForm, origin, storageStatePath, submissionPath } from "./support";
+import { createForm, d1, firstForm, origin, storageStatePath, submissionPath } from "./support";
 
 let owner: APIRequestContext;
 
@@ -30,9 +30,22 @@ test("POST /forms without an Origin header is rejected", async () => {
 	expect(response.status()).toBe(403);
 });
 
-test("POST /forms with a matching Origin is allowed", async () => {
-	const response = await postForm({ Origin: origin });
-	expect(response.status()).toBe(302);
+test("a no-JS remote form post with a matching Origin is allowed", async () => {
+	const formId = createForm("CSRF Probe");
+	const settingsPath = `/forms/${formId}/settings`;
+	const html = await (await owner.get(settingsPath)).text();
+	const action = html.match(/action="(\?\/remote=[^"]*\/renameForm\/[^"]*)"/)?.[1];
+	expect(action).toBeDefined();
+	const fields = Object.fromEntries(
+		[...html.matchAll(/name="((?:id|name)\/[^"]*\/renameForm)"/g)].map(([, field]) => [field, field.startsWith("id/") ? formId : "CSRF Probe Renamed"]),
+	);
+	const response = await owner.post(`${settingsPath}${action}`, {
+		form: fields,
+		headers: { Origin: origin, Accept: "text/html" },
+		maxRedirects: 0,
+	});
+	expect(response.status()).toBe(200);
+	expect(d1(`SELECT name FROM forms WHERE id = '${formId}'`)).toEqual([{ name: "CSRF Probe Renamed" }]);
 });
 
 test("a no-JS remote form post without an Origin header is rejected", async () => {
