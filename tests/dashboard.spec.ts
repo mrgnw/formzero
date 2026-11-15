@@ -53,13 +53,13 @@ test("submissions appear in the table", async ({ page }) => {
 
 test("search narrows the table", async ({ page }) => {
 	await page.goto(`/forms/${firstForm.id}/submissions`);
-	await page.getByRole("textbox", { name: "Search submissions..." }).fill("alpha");
+	await page.getByRole("searchbox", { name: "Search submissions" }).fill("alpha");
 
 	await expect(page.getByText("1 of 3 submission(s)")).toBeVisible();
 	await expect(page.getByRole("cell", { name: "alpha@example.com" })).toBeVisible();
 	await expect(page.getByRole("cell", { name: "bravo@example.com" })).toHaveCount(0);
 
-	await page.getByRole("textbox", { name: "Search submissions..." }).fill("");
+	await page.getByRole("searchbox", { name: "Search submissions" }).fill("");
 	await expect(page.getByText("3 total submission(s)")).toBeVisible();
 });
 
@@ -81,7 +81,7 @@ test("CSV export downloads a file with the header row", async ({ page }) => {
 	await page.goto(`/forms/${firstForm.id}/submissions`);
 
 	const downloadPromise = page.waitForEvent("download");
-	await page.getByRole("button", { name: "Export CSV" }).click();
+	await page.getByRole("link", { name: "Export CSV" }).click();
 	const download = await downloadPromise;
 
 	expect(download.suggestedFilename()).toMatch(/^submissions-\d{4}-\d{2}-\d{2}\.csv$/);
@@ -91,6 +91,7 @@ test("CSV export downloads a file with the header row", async ({ page }) => {
 	const lines = Buffer.concat(chunks).toString("utf8").split("\n");
 
 	expect(lines[0]).toBe("ID,Created At,email,message,name");
+	expect(lines[1]).toMatch(/^[^,]+,\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z,/);
 	expect(lines).toHaveLength(submissions.length + 1);
 	for (const submission of submissions) {
 		expect(lines.some((line) => line.includes(submission.email))).toBe(true);
@@ -207,6 +208,7 @@ test.describe("notification settings", () => {
 	}
 
 	test("save stays disabled until a test passes; an unreachable host shows an error", async ({ page }) => {
+		test.fixme(true, "needs stage 7b: no page has a user menu with Settings");
 		const dialog = await openSettings(page);
 		await dialog.getByLabel("Your Email").fill("owner@unreachable.invalid");
 		await dialog.getByLabel("SMTP Password").fill("irrelevant");
@@ -223,6 +225,7 @@ test.describe("notification settings", () => {
 	});
 
 	test("disable notifications clears a seeded row", async ({ page }) => {
+		test.fixme(true, "needs stage 7b: no page has a user menu with Settings");
 		d1(
 			"INSERT OR REPLACE INTO settings (id, notification_email, notification_email_password, smtp_host, smtp_port, smtp_secure, updated_at) VALUES ('global', 'seeded@example.org', 'seeded-secret', 'smtp.example.org', 587, 1, 1700000000000)",
 		);

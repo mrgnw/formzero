@@ -1,4 +1,4 @@
-import { Outlet, redirect, useLoaderData } from "react-router"
+import { Outlet, redirect, redirectDocument, useLoaderData } from "react-router"
 import type { Route } from "./+types/forms"
 import type { Form } from "#/types/form"
 import { AppSidebar } from "#/components/app-sidebar"
@@ -29,7 +29,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
   const url = new URL(request.url)
   const pathname = url.pathname.replace(/\/$/, "") // Remove trailing slash
   if (pathname === "/forms") {
-    return redirect(`/forms/${forms[0].id}/submissions`)
+    return redirectDocument(`/forms/${forms[0].id}/submissions`)
   }
 
   return { forms, user }
@@ -73,7 +73,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     .bind(id, name, createdAt, createdAt)
     .run()
 
-  return redirect(`/forms/${id}/submissions`)
+  return redirectDocument(`/forms/${id}/submissions`)
 }
 
 export default function Forms() {

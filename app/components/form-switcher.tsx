@@ -1,6 +1,6 @@
 import * as React from "react"
 import { ChevronsUpDown, Plus } from "lucide-react"
-import { useFetcher, useLocation, useNavigate, useParams } from "react-router"
+import { useFetcher, useLocation, useParams } from "react-router"
 import type { Form } from "#/types/form"
 import {
   DropdownMenu,
@@ -34,7 +34,6 @@ type FormSwitcherProps = {
 
 export function FormSwitcher({ forms }: FormSwitcherProps) {
   const { isMobile } = useSidebar()
-  const navigate = useNavigate()
   const params = useParams()
   const formId = params.formId || forms[0].id
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
@@ -77,7 +76,7 @@ export function FormSwitcher({ forms }: FormSwitcherProps) {
             {forms.map((form) => (
               <DropdownMenuItem
                 key={form.id}
-                onClick={() => navigate(`/forms/${form.id}/submissions`)}
+                onClick={() => window.location.assign(`/forms/${form.id}/submissions`)}
                 className="gap-2 p-2"
               >
                 <img src="/favicon.svg" alt="" className="size-6 rounded-md shrink-0" />

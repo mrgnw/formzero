@@ -157,7 +157,6 @@ test.describe("signed in", () => {
 	});
 
 	test("an unknown form is a 404", async ({ request }) => {
-		test.fixme(true, "needs stage 0: unknown form id 404");
 		const response = await request.get("/forms/no-such-form/submissions", { maxRedirects: 0 });
 		expect(response.status()).toBe(404);
 	});

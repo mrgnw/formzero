@@ -7,7 +7,7 @@
 
 	const formId = $derived(page.params.formId);
 	const items = $derived([
-		{ title: 'Submissions', url: `/forms/${formId}/submissions`, icon: Database, reload: true },
+		{ title: 'Submissions', url: `/forms/${formId}/submissions`, icon: Database, reload: false },
 		{ title: 'Integration', url: `/forms/${formId}/integration`, icon: Puzzle, reload: false },
 		{ title: 'Settings', url: `/forms/${formId}/settings`, icon: Settings, reload: false }
 	]);
