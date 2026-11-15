@@ -1,12 +1,16 @@
 import { env } from 'cloudflare:workers';
 
+export const EXPIRED_ROWS_DELETED_PER_HIT = 100;
+
 export type RateLimit = { allowed: boolean; retryAfter: number };
 
 export async function hit(key: string, limit: number, windowSeconds: number): Promise<RateLimit> {
 	const now = Date.now();
 	const windowMs = windowSeconds * 1000;
 	const [, upsert] = await env.DB.batch<{ count: number; reset_at: number }>([
-		env.DB.prepare('DELETE FROM rate_limits WHERE reset_at <= ?').bind(now),
+		env.DB.prepare(
+			'DELETE FROM rate_limits WHERE key IN (SELECT key FROM rate_limits WHERE reset_at <= ?1 ORDER BY reset_at LIMIT ?2)'
+		).bind(now, EXPIRED_ROWS_DELETED_PER_HIT),
 		env.DB.prepare(
 			`INSERT INTO rate_limits (key, count, reset_at) VALUES (?1, 1, ?2 + ?3)
 			ON CONFLICT (key) DO UPDATE SET
