@@ -269,6 +269,16 @@ test.describe("rate limits", () => {
 		expect(otherIp.status()).toBe(201);
 	});
 
+	test("each hit deletes at most 100 expired rate-limit rows", async ({ request }) => {
+		const cleanupForm = createForm("Limiter Cleanup");
+		const expired = Array.from({ length: 150 }, (_, row) => `('expired:${row}', 1, 1)`).join(", ");
+		d1(`INSERT INTO rate_limits (key, count, reset_at) VALUES ${expired}`);
+		const response = await post(request, submissionPath(cleanupForm), { data: { name: "Ada" } });
+		expect(response.status()).toBe(201);
+		expect(d1("SELECT COUNT(*) AS count FROM rate_limits WHERE key LIKE 'expired:%'")[0].count).toBe(50);
+		d1("DELETE FROM rate_limits WHERE key LIKE 'expired:%'");
+	});
+
 	test("submissions are still stored when the rate limiter table is missing", async ({ request }) => {
 		const failOpenForm = createForm("Limiter Down");
 		d1("DROP TABLE rate_limits");
