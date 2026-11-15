@@ -1,9 +1,8 @@
 import { type Page, expect, test } from "@playwright/test";
-import { authedRequest, credentials, d1, origin, postSubmission } from "./support";
+import { authedRequest, credentials, d1, firstForm, origin, postSubmission } from "./support";
 
 test.describe.configure({ mode: "serial" });
 
-const firstForm = { name: "Contact Form", id: "contact-form" };
 const secondForm = { name: "Second Form", id: "second-form" };
 
 const submissions = [
@@ -19,15 +18,6 @@ async function expectRowOrder(page: Page, emails: string[]) {
 	await expect(dataRows).toHaveCount(emails.length);
 	await expect(dataRows).toContainText(emails);
 }
-
-test("create the first form from /setup", async ({ page }) => {
-	await page.goto("/setup");
-	await page.getByLabel("Form Name").fill(firstForm.name);
-	await page.getByRole("button", { name: "Create Form" }).click();
-
-	await expect(page).toHaveURL(`/forms/${firstForm.id}/submissions`);
-	await expect(page.getByText("No submissions yet")).toBeVisible();
-});
 
 test("create a second form from the switcher", async ({ page }) => {
 	await page.goto(`/forms/${firstForm.id}/submissions`);

@@ -1,5 +1,5 @@
 import { expect, test as setup } from "@playwright/test";
-import { credentials, storageStatePath } from "./support";
+import { credentials, firstForm, storageStatePath } from "./support";
 
 setup("first signup creates the account and signs in", async ({ page }) => {
 	await page.goto("/login");
@@ -26,6 +26,20 @@ setup("signed in with no forms, / and /forms lead to /setup", async ({ browser }
 
 	await page.goto("/forms");
 	await expect(page).toHaveURL(/\/setup$/);
+
+	await context.close();
+});
+
+setup("create the first form from /setup", async ({ browser }) => {
+	const context = await browser.newContext({ storageState: storageStatePath });
+	const page = await context.newPage();
+
+	await page.goto("/setup");
+	await page.getByLabel("Form Name").fill(firstForm.name);
+	await page.getByRole("button", { name: "Create Form" }).click();
+
+	await expect(page).toHaveURL(`/forms/${firstForm.id}/submissions`);
+	await expect(page.getByText("No submissions yet")).toBeVisible();
 
 	await context.close();
 });
