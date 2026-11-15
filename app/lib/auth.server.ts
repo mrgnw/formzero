@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth"
 import { D1Dialect } from 'kysely-d1';
 
 export function getAuth(env: Env) {
+    if (!env.BETTER_AUTH_SECRET) throw new Error("BETTER_AUTH_SECRET is not set")
     return betterAuth({
         database: {
            type: "sqlite",
