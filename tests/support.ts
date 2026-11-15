@@ -13,6 +13,8 @@ export const credentials = {
 	password: "correct-horse-battery",
 };
 
+export const firstForm = { name: "Contact Form", id: "contact-form" };
+
 export const originHeaders = { Origin: origin };
 
 export const emptyStorageState = { cookies: [], origins: [] };
