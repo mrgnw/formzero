@@ -177,3 +177,39 @@ test.describe("result pages", () => {
 		});
 	}
 });
+
+test.describe("CSV export", () => {
+	test("a signed-out visitor is sent to /login", async ({ request }) => {
+		const response = await request.get(`/forms/${formId}/submissions.csv`, { maxRedirects: 0 });
+		expect(response.status()).toBe(302);
+		expect(response.headers()["location"]).toBe("/login");
+	});
+
+	test("an unknown form is a 404", async () => {
+		const owner = await authedRequest();
+		const response = await owner.get("/forms/no-such-form/submissions.csv", { maxRedirects: 0 });
+		expect(response.status()).toBe(404);
+		await owner.dispose();
+	});
+
+	test("columns are ID, ISO time, then sorted keys, with values escaped", async () => {
+		const owner = await authedRequest();
+		const csvFormId = await createForm(owner, "CSV Export");
+		const created = await owner.post(submissionPath(csvFormId), {
+			data: { zeta: "plain", alpha: 'a, "quoted"\nline' },
+		});
+		const { id } = await created.json();
+
+		const response = await owner.get(`/forms/${csvFormId}/submissions.csv`);
+		expect(response.status()).toBe(200);
+		expect(response.headers()["content-type"]).toBe("text/csv; charset=utf-8");
+		expect(response.headers()["content-disposition"]).toMatch(
+			/^attachment; filename="submissions-\d{4}-\d{2}-\d{2}\.csv"$/,
+		);
+		const body = await response.text();
+		expect(body).toMatch(
+			new RegExp(`^ID,Created At,alpha,zeta\\n${id},\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z,"a, ""quoted""\\nline",plain$`),
+		);
+		await owner.dispose();
+	});
+});
