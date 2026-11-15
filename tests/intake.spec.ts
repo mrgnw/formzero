@@ -85,3 +85,74 @@ test.describe("multipart files", () => {
 		await expect(page.getByRole("heading", { name: "Submission Rejected" })).toBeVisible();
 	});
 });
+
+test.describe("limits", () => {
+	const tooLarge = { success: false, error: "Submission is larger than 65536 bytes" };
+
+	test("a body over 64 KiB is a 413", async ({ request }) => {
+		const response = await postJson(request, JSON.stringify({ message: "x".repeat(70_000) }));
+		await expectRejected(response, 413, tooLarge.error);
+	});
+
+	test("a chunked body over 64 KiB without Content-Length is a 413", async ({ baseURL }) => {
+		const chunk = new TextEncoder().encode(`"${"x".repeat(16_000)}",`);
+		let sent = 0;
+		const body = new ReadableStream<Uint8Array>({
+			pull(controller) {
+				if (sent === 0) controller.enqueue(new TextEncoder().encode('{"a":['));
+				if (sent++ < 8) controller.enqueue(chunk);
+				else controller.close();
+			},
+		});
+		const response = await fetch(`${baseURL}${submissionPath(formId)}`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json", ...originHeaders },
+			body,
+			duplex: "half",
+		} as RequestInit);
+		expect(response.status).toBe(413);
+		expect(await response.json()).toEqual(tooLarge);
+	});
+
+	test("an oversized form post sends a browser to the error page", async ({ request }) => {
+		const response = await post(request, { form: { message: "x".repeat(70_000) } });
+		expect(response.status()).toBe(302);
+		expect(response.headers()["location"]).toBe("/error?error=invalid_submission");
+	});
+
+	test("more than 100 fields is a 400", async ({ request }) => {
+		const fields = Object.fromEntries(Array.from({ length: 101 }, (_, i) => [`f${i}`, "v"]));
+		await expectRejected(await postJson(request, JSON.stringify(fields)), 400, "Submission has more than 100 fields");
+	});
+
+	test("a field name over 100 characters is a 400", async ({ request }) => {
+		const response = await postJson(request, JSON.stringify({ ["n".repeat(101)]: "v" }));
+		await expectRejected(response, 400, "Field names must be at most 100 characters");
+	});
+
+	test("a value over 10,000 characters is a 400", async ({ request }) => {
+		const response = await post(request, {
+			form: { message: "x".repeat(10_001) },
+			headers: { Accept: "application/json" },
+		});
+		await expectRejected(response, 400, "Field values must be at most 10000 characters");
+	});
+
+	for (const value of [{ nested: true }, [["deep"]], [{ a: 1 }]]) {
+		test(`nested value ${JSON.stringify(value)} is a 400`, async ({ request }) => {
+			const response = await postJson(request, JSON.stringify({ field: value }));
+			await expectRejected(response, 400, "Field values must be strings, numbers, booleans, null or arrays of those");
+		});
+	}
+
+	test("100 fields with primitives and arrays of primitives at the limits are accepted", async ({ request }) => {
+		const fields: Record<string, unknown> = Object.fromEntries(
+			Array.from({ length: 97 }, (_, i) => [`f${i}`, i]),
+		);
+		fields["n".repeat(100)] = "x".repeat(10_000);
+		fields.tags = ["a", 1, true, null];
+		fields.empty = null;
+		const response = await postJson(request, JSON.stringify(fields));
+		expect(response.status()).toBe(201);
+	});
+});

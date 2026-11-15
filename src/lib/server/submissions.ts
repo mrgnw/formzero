@@ -9,6 +9,11 @@ export const corsHeaders = {
 	'Access-Control-Max-Age': '86400'
 };
 
+const MAX_BODY_BYTES = 64 * 1024;
+const MAX_FIELDS = 100;
+const MAX_NAME_LENGTH = 100;
+const MAX_VALUE_LENGTH = 10_000;
+
 type Submission = { id: string; formId: string; data: Record<string, unknown>; createdAt: number };
 
 function json(body: unknown, status: number) {
@@ -25,7 +30,7 @@ function redirectTarget(request: Request) {
 
 class Rejection extends Error {
 	constructor(
-		readonly status: 400,
+		readonly status: 400 | 413,
 		message: string
 	) {
 		super(message);
@@ -44,10 +49,48 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-async function readJson(request: Request) {
+function tooLarge() {
+	return new Rejection(413, `Submission is larger than ${MAX_BODY_BYTES} bytes`);
+}
+
+async function readBody(request: Request) {
+	if (Number(request.headers.get('content-length')) > MAX_BODY_BYTES) throw tooLarge();
+	const chunks: Uint8Array<ArrayBuffer>[] = [];
+	let size = 0;
+	for await (const chunk of request.body ?? []) {
+		size += chunk.byteLength;
+		if (size > MAX_BODY_BYTES) throw tooLarge();
+		chunks.push(chunk);
+	}
+	return new Blob(chunks);
+}
+
+function isPrimitive(value: unknown) {
+	return value === null || ['string', 'number', 'boolean'].includes(typeof value);
+}
+
+function checkFields(data: Record<string, unknown>) {
+	const fields = Object.entries(data);
+	if (fields.length > MAX_FIELDS) throw new Rejection(400, `Submission has more than ${MAX_FIELDS} fields`);
+	for (const [name, value] of fields) {
+		if (name.length > MAX_NAME_LENGTH) {
+			throw new Rejection(400, `Field names must be at most ${MAX_NAME_LENGTH} characters`);
+		}
+		const values = Array.isArray(value) ? value : [value];
+		if (!values.every(isPrimitive)) {
+			throw new Rejection(400, 'Field values must be strings, numbers, booleans, null or arrays of those');
+		}
+		if (values.some((item) => typeof item === 'string' && item.length > MAX_VALUE_LENGTH)) {
+			throw new Rejection(400, `Field values must be at most ${MAX_VALUE_LENGTH} characters`);
+		}
+	}
+	return data;
+}
+
+async function readJson(body: Blob) {
 	let data: unknown;
 	try {
-		data = await request.json();
+		data = JSON.parse(await body.text());
 	} catch {
 		throw new Rejection(400, 'Malformed JSON');
 	}
@@ -55,10 +98,10 @@ async function readJson(request: Request) {
 	return data;
 }
 
-async function readForm(request: Request) {
+async function readForm(body: Blob, contentType: string) {
 	let entries: [string, FormDataEntryValue][];
 	try {
-		entries = [...(await request.formData())];
+		entries = [...(await new Response(body, { headers: { 'content-type': contentType } }).formData())];
 	} catch {
 		throw new Rejection(400, 'Malformed form data');
 	}
@@ -114,7 +157,8 @@ export async function handleSubmission(request: Request, formId: string) {
 			if (wantsJson) return json({ success: false, error: 'Unsupported content type' }, 415);
 			return redirect('/error?error=unsupported_content_type', 302);
 		}
-		const data = isJson ? await readJson(request) : await readForm(request);
+		const body = await readBody(request);
+		const data = checkFields(isJson ? await readJson(body) : await readForm(body, contentType));
 
 		const submission: Submission = { id: crypto.randomUUID(), formId, data, createdAt: Date.now() };
 		await env.DB.prepare('INSERT INTO submissions (id, form_id, data, created_at) VALUES (?, ?, ?, ?)')
