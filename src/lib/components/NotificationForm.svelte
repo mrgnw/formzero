@@ -142,7 +142,7 @@
 							required
 						/>
 						<p id="smtp-port-help" class="text-sm text-muted-foreground">
-							Allowed ports: 587, 2525 or 25 (STARTTLS) and 465 (TLS)
+							Allowed ports: 587 or 2525 (STARTTLS) and 465 (TLS)
 						</p>
 						<FieldIssues id="smtp-port-issues" issues={smtp_port.issues()} />
 					</div>
