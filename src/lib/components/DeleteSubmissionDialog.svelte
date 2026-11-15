@@ -5,7 +5,7 @@
 	import type { Submission } from '#lib/server/dashboard.js';
 	import { deleteSubmission } from '#lib/submissions.remote.js';
 
-	let { submission = $bindable(null) }: { submission: Submission | null } = $props();
+	let { submission = $bindable(null) }: { submission: Pick<Submission, 'id' | 'form_id'> | null } = $props();
 
 	const pending = $derived(deleteSubmission.pending > 0);
 

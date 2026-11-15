@@ -11,8 +11,11 @@ export type SortKey = 'created_at' | 'email';
 export type Direction = 'ascending' | 'descending';
 export type Sort = { key: SortKey; direction: Direction };
 
+export type SubmissionRow = Pick<Submission, 'id' | 'form_id' | 'created_at'> & { cells: string[] };
+
 export type SubmissionPage = {
-	submissions: Submission[];
+	fields: string[];
+	rows: SubmissionRow[];
 	matching: number;
 	page: number;
 	pageCount: number;
@@ -65,6 +68,25 @@ export function parseData(text: string): Record<string, unknown> {
 	}
 }
 
+export function cellText(value: unknown): string {
+	if (typeof value === 'string') return value;
+	if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+	if (value === null || value === undefined) return '';
+	try {
+		return JSON.stringify(value) ?? '';
+	} catch {
+		return '';
+	}
+}
+
+function tableFields(submissions: Submission[]) {
+	return [...new Set(submissions.flatMap((submission) => Object.keys(submission.data)))].sort((a, b) => {
+		if (a === 'email') return -1;
+		if (b === 'email') return 1;
+		return a.localeCompare(b);
+	});
+}
+
 function likePattern(query: string) {
 	return `%${query.replace(/[\\%_]/g, '\\$&')}%`;
 }
@@ -80,8 +102,16 @@ export async function listSubmissions(formId: string, query: string, sort: Sort,
 		env.DB.prepare(`SELECT COUNT(*) AS matching FROM submissions WHERE form_id = ?1${search}`).bind(...params)
 	]);
 	const matching = (count.results[0] as { matching: number }).matching;
+	const submissions = (rows.results as Row[]).map(toSubmission);
+	const fields = tableFields(submissions);
 	return {
-		submissions: (rows.results as Row[]).map(toSubmission),
+		fields,
+		rows: submissions.map(({ id, form_id, created_at, data }) => ({
+			id,
+			form_id,
+			created_at,
+			cells: fields.map((field) => cellText(data[field]))
+		})),
 		matching,
 		page,
 		pageCount: Math.max(1, Math.ceil(matching / PAGE_SIZE))
@@ -93,14 +123,13 @@ export async function deleteSubmission(formId: string, id: string) {
 	return result.meta.changes > 0;
 }
 
-function escapeCsv(value: unknown) {
-	const text = value === undefined || value === null ? '' : String(value);
+function escapeCsv(text: string) {
 	if (/[",\r\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
 	return text;
 }
 
 function userCell(value: unknown) {
-	const text = value === undefined || value === null ? '' : String(value);
+	const text = cellText(value);
 	return escapeCsv(/^[=+\-@\t\r]/.test(text) ? `'${text}` : text);
 }
 
