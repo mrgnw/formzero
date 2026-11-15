@@ -5,6 +5,8 @@ import { data } from "react-router"
 export async function loader({ context, request }: Route.LoaderArgs) {
   const database = context.cloudflare.env.DB
 
+  await requireAuth(request, database)
+
   // Fetch global settings
   const settings = await database
     .prepare("SELECT * FROM settings WHERE id = 'global'")
