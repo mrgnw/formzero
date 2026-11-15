@@ -23,8 +23,49 @@ function redirectTarget(request: Request) {
 	return new URL(request.url).searchParams.get('redirect') || request.headers.get('referer') || '/success';
 }
 
-function isFormEncoded(contentType: string) {
-	return contentType.includes('application/x-www-form-urlencoded') || contentType.includes('multipart/form-data');
+class Rejection extends Error {
+	constructor(
+		readonly status: 400,
+		message: string
+	) {
+		super(message);
+	}
+}
+
+function mediaType(contentType: string) {
+	return contentType.split(';')[0].trim().toLowerCase();
+}
+
+function isFormEncoded(type: string) {
+	return type === 'application/x-www-form-urlencoded' || type === 'multipart/form-data';
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+async function readJson(request: Request) {
+	let data: unknown;
+	try {
+		data = await request.json();
+	} catch {
+		throw new Rejection(400, 'Malformed JSON');
+	}
+	if (!isPlainObject(data)) throw new Rejection(400, 'Submission must be a JSON object');
+	return data;
+}
+
+async function readForm(request: Request) {
+	let entries: [string, FormDataEntryValue][];
+	try {
+		entries = [...(await request.formData())];
+	} catch {
+		throw new Rejection(400, 'Malformed form data');
+	}
+	if (entries.some(([, value]) => typeof value !== 'string')) {
+		throw new Rejection(400, 'File uploads are not supported');
+	}
+	return Object.fromEntries(entries);
 }
 
 async function notify(submission: Submission) {
@@ -58,7 +99,8 @@ async function notify(submission: Submission) {
 export async function handleSubmission(request: Request, formId: string) {
 	const contentType = request.headers.get('content-type') || '';
 	const accept = request.headers.get('accept') || '';
-	const isJson = contentType.includes('application/json');
+	const type = mediaType(contentType);
+	const isJson = type === 'application/json';
 	const wantsJson = isJson || accept.includes('application/json');
 
 	try {
@@ -68,11 +110,11 @@ export async function handleSubmission(request: Request, formId: string) {
 			return redirect('/error?error=form_not_found', 302);
 		}
 
-		if (!isJson && !isFormEncoded(contentType)) {
+		if (!isJson && !isFormEncoded(type)) {
 			if (wantsJson) return json({ success: false, error: 'Unsupported content type' }, 415);
 			return redirect('/error?error=unsupported_content_type', 302);
 		}
-		const data: Submission['data'] = isJson ? await request.json() : Object.fromEntries(await request.formData());
+		const data = isJson ? await readJson(request) : await readForm(request);
 
 		const submission: Submission = { id: crypto.randomUUID(), formId, data, createdAt: Date.now() };
 		await env.DB.prepare('INSERT INTO submissions (id, form_id, data, created_at) VALUES (?, ?, ?, ?)')
@@ -86,6 +128,10 @@ export async function handleSubmission(request: Request, formId: string) {
 		if (wantsJson) return json({ success: true, id: submission.id }, 201);
 		return redirect(redirectTarget(request), 303);
 	} catch (error) {
+		if (error instanceof Rejection) {
+			if (wantsJson) return json({ success: false, error: error.message }, error.status);
+			return redirect('/error?error=invalid_submission', 302);
+		}
 		console.error('Error processing form submission:', error);
 		if (wantsJson) return json({ success: false, error: 'Failed to process submission' }, 500);
 		return redirect('/error?error=internal_error', 302);
