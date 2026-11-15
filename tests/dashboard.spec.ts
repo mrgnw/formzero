@@ -564,3 +564,27 @@ test("stored values that cannot be turned into text with String() still render a
 	expect(body).toContain('hostile-0,2023-11-14T22:13:20.000Z,a@example.com,"{""toString"":null}"');
 	expect(body).toContain('hostile-4,2023-11-14T22:13:20.004Z,d@example.com,Infinity,1.2345678901234568e+29');
 });
+
+test("unknown sort names, huge pages and long searches are bounded", async ({ page }) => {
+	const base = "/forms/paged-form/submissions";
+	for (const sort of ["toString", "__proto__", "constructor", "hasOwnProperty"]) {
+		const response = await page.goto(`${base}?sort=${sort}`);
+		expect(response?.status()).toBe(200);
+		await expect(page.getByRole("columnheader", { name: "Time" })).toHaveAttribute("aria-sort", "descending");
+	}
+
+	await page.goto(`${base}?page=999999999&sort=email`);
+	await expect(page).toHaveURL(`${base}?page=3&sort=email`);
+	await expect(page.getByText("Page 3 of 3")).toBeVisible();
+
+	const long = `user1${"x".repeat(5_000)}`;
+	const response = await page.goto(`${base}?q=${long}`);
+	expect(response?.status()).toBe(200);
+	await expect(page.getByText("0 of 120 submission(s)")).toBeVisible();
+	await expect(page.getByRole("searchbox", { name: "Search submissions" })).toHaveValue(long.slice(0, 200));
+
+	await page.goto(`${base}?q=${encodeURIComponent("%_ USER042@EXAMPLE.COM")}`);
+	await expect(page.getByText("0 of 120 submission(s)")).toBeVisible();
+	await page.goto(`${base}?q=${encodeURIComponent("USER042@EXAMPLE.COM")}`);
+	await expect(page.getByText("1 of 120 submission(s)")).toBeVisible();
+});
