@@ -1,6 +1,6 @@
 import { createServer, type Server } from "node:net";
 import { expect, test } from "@playwright/test";
-import { sendTestEmail, smtpTransportOptions } from "../src/lib/server/email";
+import { sendTestEmail, smtpTransportOptions, submissionNotification } from "../src/lib/server/email";
 
 const account = { notification_email: "owner@example.com", notification_email_password: "smtp-secret", smtp_host: "127.0.0.1" };
 
@@ -41,4 +41,15 @@ test("a server without STARTTLS never receives the credentials", async () => {
 	} finally {
 		server.close();
 	}
+});
+
+test("markup and control characters in a form name are neutralised in notification mail", () => {
+	const formName = '<img src=x onerror="alert(1)"><b>Evil</b>\r\nBcc: victim@example.com\u0007';
+	const message = submissionNotification({ id: "sub-1", formId: "evil", formName, data: { name: "Ada" }, createdAt: 0 });
+	expect(message.html).not.toContain("<img");
+	expect(message.html).not.toContain("<b>Evil");
+	expect(message.html).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;&lt;b&gt;Evil&lt;/b&gt;");
+	expect(message.subject).toBe('New Submission for "<img src=x onerror="alert(1)"><b>Evil</b>  Bcc: victim@example.com "');
+	expect(message.text).not.toMatch(/[\r\u0007]/);
+	expect(message.text).toContain("Form: <img src=x onerror=\"alert(1)\"><b>Evil</b>  Bcc: victim@example.com \n");
 });

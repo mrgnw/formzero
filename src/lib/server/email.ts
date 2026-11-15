@@ -126,29 +126,47 @@ export async function sendSubmissionNotification(
     // Create nodemailer transporter
     const transporter = nodemailer.createTransport(smtpTransportOptions(config))
 
-    // Format the submission data for email display
-    const submissionHtml = formatSubmissionData(submission.data)
-    const submissionText = formatSubmissionDataText(submission.data)
-
-    // Format timestamp
-    const timestamp = new Date(submission.createdAt).toLocaleString('en-US', {
-      dateStyle: 'full',
-      timeStyle: 'long',
-    })
-
-    // Send email
     await transporter.sendMail({
       from: config.notification_email,
       to: config.notification_email,
-      subject: `New Submission for "${submission.formName}"`,
-      text: `
+      ...submissionNotification(submission),
+    })
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error sending notification email:", error)
+
+    let errorMessage = "Failed to send notification email"
+    if (error instanceof Error) {
+      errorMessage = error.message
+    }
+
+    return { success: false, error: errorMessage }
+  }
+}
+
+export function submissionNotification(submission: SubmissionEmailData) {
+  const formName = submission.formName.replace(/[\p{Cc}\p{Cf}]/gu, " ")
+  // Format the submission data for email display
+  const submissionHtml = formatSubmissionData(submission.data)
+  const submissionText = formatSubmissionDataText(submission.data)
+
+  // Format timestamp
+  const timestamp = new Date(submission.createdAt).toLocaleString('en-US', {
+    dateStyle: 'full',
+    timeStyle: 'long',
+  })
+
+  return {
+    subject: `New Submission for "${formName}"`,
+    text: `
 FormZero - New Form Submission
 
-You have received a new submission for your form "${submission.formName}".
+You have received a new submission for your form "${formName}".
 
 SUBMISSION DETAILS
 ==================
-Form: ${submission.formName}
+Form: ${formName}
 Submission ID: ${submission.id}
 Received: ${timestamp}
 
@@ -158,8 +176,8 @@ ${submissionText}
 
 ---
 This email was automatically sent by FormZero
-      `.trim(),
-      html: `
+    `.trim(),
+    html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -180,7 +198,7 @@ This email was automatically sent by FormZero
                 New Form Submission
               </h1>
               <p style="margin: 8px 0 0 0; color: #b4b4b4; font-size: 16px;">
-                ${submission.formName}
+                ${escapeHtml(formName)}
               </p>
             </td>
           </tr>
@@ -191,7 +209,7 @@ This email was automatically sent by FormZero
 
               <!-- Introduction -->
               <p style="margin: 0 0 24px 0; color: #252525; font-size: 16px; line-height: 1.6;">
-                You have received a new submission for your form <strong>${submission.formName}</strong>.
+                You have received a new submission for your form <strong>${escapeHtml(formName)}</strong>.
               </p>
 
               <!-- Metadata -->
@@ -233,19 +251,7 @@ This email was automatically sent by FormZero
   </table>
 </body>
 </html>
-      `.trim(),
-    })
-
-    return { success: true }
-  } catch (error) {
-    console.error("Error sending notification email:", error)
-
-    let errorMessage = "Failed to send notification email"
-    if (error instanceof Error) {
-      errorMessage = error.message
-    }
-
-    return { success: false, error: errorMessage }
+    `.trim(),
   }
 }
 
