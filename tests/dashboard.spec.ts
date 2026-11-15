@@ -199,6 +199,7 @@ test("the switcher on a svelte page creates a form", async ({ page }) => {
 
 test.describe("notification settings", () => {
 	const seededPassword = "seeded-secret";
+	const connectError = "Could not connect to the SMTP server. Check the host and port.";
 
 	function seedSettings(host: string, port: number) {
 		d1(
@@ -228,9 +229,31 @@ test.describe("notification settings", () => {
 		await expect(dialog.getByText("Send a test email first to verify your settings")).toBeVisible();
 
 		await dialog.getByRole("button", { name: "Send test email" }).click();
-		await expect(dialog.getByText(/cannot connect/i)).toBeVisible();
+		await expect(dialog.getByText(connectError)).toBeVisible();
 		await expect(dialog.getByText("Test email sent!")).toHaveCount(0);
 		await expect(save).toBeDisabled();
+	});
+
+	test("a failed test email shows a classified message, never the raw smtp error", async ({ page }) => {
+		const typedPassword = "typed-secret-4821";
+		const bodies: string[] = [];
+		page.on("response", async (response) => {
+			if (response.url().includes("/_app/remote/")) bodies.push(await response.text().catch(() => ""));
+		});
+
+		const dialog = await openSettings(page);
+		await dialog.getByLabel("Your Email").fill("owner@unreachable.invalid");
+		await dialog.getByLabel("SMTP Password").fill(typedPassword);
+		await dialog.getByLabel("SMTP Host").fill("127.0.0.1");
+		await dialog.getByLabel("SMTP Port").fill("1");
+		await dialog.getByRole("button", { name: "Send test email" }).click();
+
+		await expect(dialog.getByText(connectError)).toBeVisible();
+		const failed = bodies.find((body) => body.includes(connectError));
+		expect(failed).toBeDefined();
+		expect(failed).not.toContain(typedPassword);
+		expect(failed).not.toContain("ECONNREFUSED");
+		expect(failed).not.toContain("127.0.0.1:1");
 	});
 
 	test("the stored password never reaches the browser", async ({ page }) => {
@@ -247,7 +270,7 @@ test.describe("notification settings", () => {
 		await expect(password).toHaveAttribute("placeholder", "Leave blank to keep the saved password");
 
 		await dialog.getByRole("button", { name: "Send test email" }).click();
-		await expect(dialog.getByText(/cannot connect/i)).toBeVisible();
+		await expect(dialog.getByText(connectError)).toBeVisible();
 		expect(bodies.some((body) => body.includes(seededPassword))).toBe(false);
 	});
 
@@ -264,7 +287,7 @@ test.describe("notification settings", () => {
 		await dialog.getByLabel("SMTP Password").evaluate((input: HTMLInputElement) => (input.required = false));
 		await sendTest.click();
 		await expect(dialog.getByText("SMTP password is required")).toBeVisible();
-		await expect(dialog.getByText(/cannot connect/i)).toHaveCount(0);
+		await expect(dialog.getByText(connectError)).toHaveCount(0);
 	});
 
 	test("settings remote calls are refused cross-origin and when signed out", async ({ page }) => {
