@@ -112,6 +112,22 @@ test.describe("signed out", () => {
 		await page.goto("/forms");
 		await expect(page).toHaveURL(/\/login$/);
 	});
+
+	test("logout from the user menu on a svelte page", async ({ page }) => {
+		await page.goto("/login");
+		await page.getByLabel("Email").fill(credentials.email);
+		await page.getByLabel("Password").fill(credentials.password);
+		await page.getByRole("button", { name: "Sign In" }).click();
+		await expect(page).toHaveURL(/\/forms\/[^/]+\/submissions$/);
+
+		await page.goto(page.url().replace(/submissions$/, "integration"));
+		await page.getByRole("button", { name: new RegExp(credentials.name) }).click();
+		await page.getByRole("menuitem", { name: "Log out" }).click();
+		await expect(page).toHaveURL(/\/login$/);
+
+		await page.goto("/forms/anything/integration");
+		await expect(page).toHaveURL(/\/login$/);
+	});
 });
 
 test.describe("signed in", () => {

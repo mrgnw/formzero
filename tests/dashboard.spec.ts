@@ -131,6 +131,71 @@ test("copy endpoint puts the URL on the clipboard", async ({ page, context }) =>
 	expect(clipboard).toBe(`${origin}/api/forms/${firstForm.id}/submissions`);
 });
 
+test("integration snippets follow the redirect URL and copy per block", async ({ page, context }) => {
+	await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+	await page.goto(`/forms/${firstForm.id}/integration`);
+	const action = `${origin}/api/forms/${firstForm.id}/submissions?redirect=${encodeURIComponent("https://example.com/thanks?a=<b>")}`;
+	await expect(async () => {
+		await page.getByLabel("Redirect URL (optional)").fill("https://example.com/thanks?a=<b>");
+		await expect(page.getByRole("tabpanel").getByText(`"${action}"`)).toBeVisible({ timeout: 1_000 });
+	}).toPass();
+
+	await page.getByRole("button", { name: "Copy HTML form" }).click();
+	await expect(page.getByRole("button", { name: "Copied!" })).toHaveCount(1);
+	const clipboard = await page.evaluate(() => navigator.clipboard.readText());
+	expect(clipboard).toContain(`<form action="${action}" method="POST">`);
+
+	await page.getByRole("tab", { name: "SvelteKit" }).click();
+	await expect(page.getByRole("button", { name: "Copy remote function" })).toBeVisible();
+	await expect(page.getByRole("button", { name: "Copy component" })).toBeVisible();
+});
+
+test("sidebar links cross between the react and svelte pages", async ({ page }) => {
+	await page.goto(`/forms/${firstForm.id}/submissions`);
+	await page.getByRole("link", { name: "Integration" }).click();
+	await expect(page).toHaveURL(`/forms/${firstForm.id}/integration`);
+	await expect(page.getByText("Integration Examples")).toBeVisible();
+
+	await page.getByRole("link", { name: "Submissions" }).click();
+	await expect(page).toHaveURL(`/forms/${firstForm.id}/submissions`);
+	await expect(page.getByText("2 total submission(s)")).toBeVisible();
+});
+
+test("collapsing the sidebar is remembered across reloads", async ({ page }) => {
+	await page.goto(`/forms/${firstForm.id}/integration`);
+	const nav = page.getByRole("link", { name: "Settings" });
+	await expect(nav).toBeVisible();
+
+	const toggle = page.getByRole("main").getByRole("button", { name: "Toggle Sidebar" });
+	await expect(async () => {
+		await toggle.click();
+		await expect(nav).not.toBeInViewport({ timeout: 1_000 });
+	}).toPass();
+	await page.reload();
+	await expect(nav).not.toBeInViewport();
+
+	await expect(async () => {
+		await toggle.click();
+		await expect(nav).toBeInViewport({ timeout: 1_000 });
+	}).toPass();
+});
+
+test("the switcher on a svelte page creates a form", async ({ page }) => {
+	await page.goto(`/forms/${firstForm.id}/integration`);
+	await page.getByRole("button", { name: new RegExp(firstForm.name) }).click();
+	await page.getByRole("menuitem", { name: "Add form" }).click();
+
+	const dialog = page.getByRole("dialog", { name: "Create New Form" });
+	await dialog.getByLabel("Form Name").fill(secondForm.name);
+	await dialog.getByRole("button", { name: "Create Form" }).click();
+	await expect(dialog.getByText("A form with this name already exists")).toBeVisible();
+
+	await dialog.getByLabel("Form Name").fill("Third Form");
+	await dialog.getByRole("button", { name: "Create Form" }).click();
+	await expect(page).toHaveURL("/forms/third-form/submissions");
+	await expect(page.getByText("No submissions yet")).toBeVisible();
+});
+
 test.describe("notification settings", () => {
 	async function openSettings(page: Page) {
 		await page.goto(`/forms/${firstForm.id}/submissions`);

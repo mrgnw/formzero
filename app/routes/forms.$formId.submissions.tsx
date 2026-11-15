@@ -231,7 +231,7 @@ export default function SubmissionsPage() {
             </EmptyHeader>
             <EmptyContent>
               <Button asChild>
-                <Link to="../integration">Integrate</Link>
+                <Link to="../integration" reloadDocument>Integrate</Link>
               </Button>
             </EmptyContent>
           </Empty>
