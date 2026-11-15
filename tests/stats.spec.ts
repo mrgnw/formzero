@@ -1,7 +1,6 @@
-import { readFileSync, readdirSync } from "node:fs";
-import Database from "better-sqlite3";
 import { expect, test } from "@playwright/test";
 import { dailyCounts, submissionStats } from "../src/lib/server/stats.js";
+import { sqliteD1 } from "./sqlite";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -31,32 +30,11 @@ function referenceDays(times: number[], now: number) {
 	});
 }
 
-function d1(sqlite: Database.Database) {
-	return {
-		prepare(sql: string) {
-			const statement = sqlite.prepare(sql);
-			let params: unknown[] = [];
-			const bound = {
-				bind(...values: unknown[]) {
-					params = values;
-					return bound;
-				},
-				first: async () => statement.get(...params) ?? null,
-				all: async () => ({ results: statement.all(...params) }),
-			};
-			return bound;
-		},
-	} as unknown as D1Database;
-}
-
 function database(times: number[]) {
-	const sqlite = new Database(":memory:");
-	for (const file of readdirSync("migrations").sort()) sqlite.exec(readFileSync(`migrations/${file}`, "utf8"));
-	sqlite.prepare("INSERT INTO forms (id, name, created_at, updated_at) VALUES ('f', 'F', 0, 0), ('other', 'O', 0, 0)").run();
-	const insert = sqlite.prepare("INSERT INTO submissions (id, form_id, data, created_at) VALUES (?, ?, '{}', ?)");
-	times.forEach((time, index) => insert.run(`s${index}`, "f", time));
-	insert.run("noise", "other", times[0] ?? 0);
-	return d1(sqlite);
+	const { db, insert } = sqliteD1();
+	times.forEach((time, index) => insert(`s${index}`, "f", "{}", time));
+	insert("noise", "other", "{}", times[0] ?? 0);
+	return db;
 }
 
 const nows = [
