@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createForm, credentials, emptyStorageState, originHeaders } from "./support";
+import { createForm, credentials, d1, emptyStorageState, originHeaders } from "./support";
 
 let formId: string;
 
@@ -96,6 +96,14 @@ test.describe("signed out", () => {
 			await expect(page.getByText(expected), `attempt ${attempt}`).toBeVisible();
 		}
 		await context.close();
+	});
+
+	test("the database refuses a second user", () => {
+		const now = Date.now();
+		expect(() =>
+			d1(`INSERT INTO "user" (id, name, email, emailVerified, createdAt, updatedAt) VALUES ('second', 'Second', 'second@example.com', 0, ${now}, ${now})`),
+		).toThrow();
+		expect(d1('SELECT COUNT(*) AS count FROM "user"')[0].count).toBe(1);
 	});
 
 	test("wrong password shows an error and stays on /login", async ({ page }) => {
