@@ -17,7 +17,4 @@ export default [
   ]),
   route("settings/notifications", "routes/settings.notifications.tsx"),
   route("settings/notifications/test", "routes/settings.notifications.test.tsx"),
-
-  route("/success", "routes/success.tsx"),
-  route("/error", "routes/error.tsx"),
 ] satisfies RouteConfig;
