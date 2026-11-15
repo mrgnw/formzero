@@ -1,12 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { authedRequest, createForm, credentials, emptyStorageState, originHeaders } from "./support";
+import { createForm, credentials, emptyStorageState, originHeaders } from "./support";
 
 let formId: string;
 
-test.beforeAll(async () => {
-	const owner = await authedRequest();
-	formId = await createForm(owner, "Auth Redirects");
-	await owner.dispose();
+test.beforeAll(() => {
+	formId = createForm("Auth Redirects");
 });
 
 test.describe("signed out", () => {

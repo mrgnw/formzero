@@ -31,10 +31,11 @@ export function authedRequest() {
 	});
 }
 
-export async function createForm(request: APIRequestContext, name: string) {
-	const response = await request.post("/forms", { form: { name }, maxRedirects: 0 });
-	expect(response.status()).toBe(302);
-	return response.headers()["location"].split("/")[2];
+export function createForm(name: string) {
+	const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+	const now = Date.now();
+	d1(`INSERT INTO forms (id, name, created_at, updated_at) VALUES ('${id}', '${name}', ${now}, ${now})`);
+	return id;
 }
 
 export async function postSubmission(request: APIRequestContext, formId: string, data: Record<string, string>) {

@@ -12,10 +12,8 @@ const corsHeaders = {
 
 let formId: string;
 
-test.beforeAll(async () => {
-	const owner = await authedRequest();
-	formId = await createForm(owner, "API Contract");
-	await owner.dispose();
+test.beforeAll(() => {
+	formId = createForm("API Contract");
 });
 
 function post(request: APIRequestContext, url: string, options: Parameters<APIRequestContext["post"]>[1]) {
@@ -181,7 +179,7 @@ test.describe("result pages", () => {
 test.describe("CSV export", () => {
 	async function exportCsv(formName: string, data: Record<string, string>) {
 		const owner = await authedRequest();
-		const csvFormId = await createForm(owner, formName);
+		const csvFormId = createForm(formName);
 		const created = await owner.post(submissionPath(csvFormId), { data });
 		const { id } = await created.json();
 		const body = await (await owner.get(`/forms/${csvFormId}/submissions.csv`)).text();
@@ -204,7 +202,7 @@ test.describe("CSV export", () => {
 
 	test("columns are ID, ISO time, then sorted keys, with values escaped", async () => {
 		const owner = await authedRequest();
-		const csvFormId = await createForm(owner, "CSV Export");
+		const csvFormId = createForm("CSV Export");
 		const created = await owner.post(submissionPath(csvFormId), {
 			data: { zeta: "plain", alpha: 'a, "quoted"\nline' },
 		});
