@@ -6,7 +6,7 @@ import { signInSchema, signUpSchema } from '#lib/schemas.js';
 
 function authFailure(error: unknown, fallback: string, unexpected: string): never {
 	if (error instanceof APIError) invalid(error.message || fallback);
-	console.error(error);
+	console.error('Unexpected authentication error:', error instanceof Error ? error.name : typeof error);
 	invalid(unexpected);
 }
 

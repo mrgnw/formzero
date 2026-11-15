@@ -72,7 +72,7 @@ export async function sendTestEmail(
 
     return { success: true, messageId: info.messageId }
   } catch (error) {
-    console.error("Error sending test email:", error)
+    console.error("Error sending test email:", smtpFailure(error))
 
     // Provide more specific error message
     let errorMessage = "Failed to send test email"
@@ -134,7 +134,7 @@ export async function sendSubmissionNotification(
 
     return { success: true }
   } catch (error) {
-    console.error("Error sending notification email:", error)
+    console.error("Error sending notification email:", smtpFailure(error))
 
     let errorMessage = "Failed to send notification email"
     if (error instanceof Error) {
