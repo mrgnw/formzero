@@ -72,13 +72,17 @@ async function readBody(request: Request) {
 	return new Blob(chunks);
 }
 
+function tooManyFields() {
+	return new Rejection(400, `Submission has more than ${MAX_FIELDS} fields`);
+}
+
 function isPrimitive(value: unknown) {
 	return value === null || ['string', 'number', 'boolean'].includes(typeof value);
 }
 
 function checkFields(data: Record<string, unknown>) {
 	const fields = Object.entries(data);
-	if (fields.length > MAX_FIELDS) throw new Rejection(400, `Submission has more than ${MAX_FIELDS} fields`);
+	if (fields.length > MAX_FIELDS) throw tooManyFields();
 	for (const [name, value] of fields) {
 		if (name.length > MAX_NAME_LENGTH) {
 			throw new Rejection(400, `Field names must be at most ${MAX_NAME_LENGTH} characters`);
@@ -112,6 +116,7 @@ async function readForm(body: Blob, contentType: string) {
 	} catch {
 		throw new Rejection(400, 'Malformed form data');
 	}
+	if (entries.length > MAX_FIELDS) throw tooManyFields();
 	if (entries.some(([, value]) => typeof value !== 'string')) {
 		throw new Rejection(400, 'File uploads are not supported');
 	}

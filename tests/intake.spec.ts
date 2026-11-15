@@ -125,6 +125,24 @@ test.describe("limits", () => {
 		await expectRejected(await postJson(request, JSON.stringify(fields)), 400, "Submission has more than 100 fields");
 	});
 
+	test("101 form parts with the same name are a 400", async ({ request }) => {
+		const response = await post(request, {
+			data: Array.from({ length: 101 }, (_, i) => `x=${i}`).join("&"),
+			headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+		});
+		await expectRejected(response, 400, "Submission has more than 100 fields");
+	});
+
+	test("100 form parts with the same name are stored, last value wins", async ({ request }) => {
+		const response = await post(request, {
+			data: Array.from({ length: 100 }, (_, i) => `x=${i}`).join("&"),
+			headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+		});
+		expect(response.status()).toBe(201);
+		const { id } = await response.json();
+		expect(d1(`SELECT data FROM submissions WHERE id = '${id}'`)[0].data).toBe('{"x":"99"}');
+	});
+
 	test("a field name over 100 characters is a 400", async ({ request }) => {
 		const response = await postJson(request, JSON.stringify({ ["n".repeat(101)]: "v" }));
 		await expectRejected(response, 400, "Field names must be at most 100 characters");
