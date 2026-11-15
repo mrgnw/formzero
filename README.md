@@ -1,104 +1,180 @@
 <h1 align="center">FormZero</h1>
 
 <div align="center">
-  A forever free, open-source form backend for static sites you can self-host on Cloudflare in one click
-  <br/>
-  <br/>
-  🔓 <em>No paid features.</em> 📀 <em>Own your data.</em> ⚡️ <em>Start in 3 minutes</em>
+	A free, open-source form backend for static sites you can self-host on Cloudflare
+	<br/>
+	<br/>
+	<em>No paid features. Own your data.</em>
 </div>
 
-<br/>
+> [!NOTE]
+> This project was built with heavy LLM assistance and should be considered proof-of-concept. Contributions are welcome, but I can't guarantee the accuracy of the code or that I will continue to maintain it. If there are any mistakes in attribution or anything else, please let me know.
 
 ![FormZero Dashboard](media/screenshot.png)
 
-<div align="center">Perfect for <em>contact forms</em>, <em>waitlists</em>, <em>surveys</em>, <em>newsletter signups</em>, and more.</div>
+For contact forms, waitlists, surveys, newsletter signups, and more.
 
-<br/>
+This is the SvelteKit fork of [Bohdan Petryshyn's FormZero](https://github.com/BohdanPetryshyn/formzero).
 
 ## Why FormZero?
 
-- **Save time** - Form backends are simple software; don't waste time building one for your static site
-- **No artificial limits** - Commercial services often restrict you to ~50 submissions/month with no data export
-- **Deploy in minutes** - As easy as signing up for a commercial service. Not a single line of code, not even YAML
-
-Use [FormZero](https://github.com/BohdanPetryshyn/formzero) for your next big thing! ⭐ Give it a star to not forget.
-
-<br/>
+- **Save time** - Connect your static site's forms to an existing backend.
+- **Own your data** - Store submissions in your Cloudflare account and export them as CSV.
+- **Self-host** - Deploy a Worker and D1 database from this repository.
 
 ## Features
 
-- **Submit HTML Forms** - Add FormZero's endpoint to your form's `action` attribute
-- **Submit JSON Data** - Send payloads via `fetch` or `XMLHttpRequest`
-- **Unlimited Forms** - Create as many as you need
-- **Unlimited Submissions** - Receive thousands per hour
-- **Analytics Dashboard** - View submission trends and stats
-- **Export CSV** - Download all submissions in one click
-- **Spam Protection** - Proof of Work CAPTCHA and honeypot fields (coming soon)
-- **Email Notifications** - Add your [Resend](http://resend.com) API key to receive notifications (coming soon)
+- **HTML forms** - Add your form's submission endpoint to its `action` attribute.
+- **JSON submissions** - Send data from JavaScript or another HTTP client.
+- **Multiple forms** - Manage forms and submissions from one dashboard.
+- **Analytics dashboard** - View submission trends and stats.
+- **CSV export** - Download submissions for a form.
+- **Email notifications** - Configure Simple Mail Transfer Protocol (SMTP) credentials in notification settings.
 
-<br/>
+FormZero has no application-level submission quota. Capacity depends on your [Cloudflare Workers limits](https://developers.cloudflare.com/workers/platform/limits/) and [D1 limits](https://developers.cloudflare.com/d1/platform/limits/).
 
-## Deploy in Seconds ⚡
+## Deploy to Cloudflare
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/BohdanPetryshyn/formzero)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/mrgnw/formzero)
 
-Deploy your own serverless form backend in seconds - as easy as signing up for a commercial service:
+1. Click **Deploy to Cloudflare** and sign in to your Cloudflare account.
+2. Follow the prompts to copy the repository, configure the Worker and D1 database, and set `BETTER_AUTH_SECRET` to a random secret of at least 32 characters.
+3. Open the deployed URL, create the first account, and create your first form. Further signups are disabled once an account exists.
 
-1. Click the ***Deploy to Cloudflare*** button above
-2. Log in to your ***free*** Cloudflare account or create one (***no credit card required***)
-3. Follow the prompts - your instance will be running in ***3 minutes***
+See [Cloudflare's deploy button documentation](https://developers.cloudflare.com/workers/platform/deploy-buttons/) for the deployment flow.
 
-Everything fits within ***Cloudflare's free tier*** - receive up to ***100,000 submissions/day*** and store up to ***4,000,000 submissions*** for free. Upgrade later for just $5 if needed.
+For manual deployment, install dependencies as described below, then set the Worker name and your own D1 database name and ID in `wrangler.jsonc`. Keep the database binding named `DB`. Configure `BETTER_AUTH_SECRET` as a Worker secret and authenticate Wrangler with your Cloudflare account before deploying. Run production deploys from a clean, fully pushed `main` checkout.
 
-<br/>
+```sh
+npm run deploy
+```
 
-### How Deploy to Cloudflare Works
+The deploy script builds the app, applies remote D1 migrations, and deploys the Worker. When updating an existing instance, keep its Worker name, D1 database, database binding, and auth secret to preserve endpoint URLs, data, and session signing. Back up the database before applying migrations.
 
-Here's what happens when you click the button:
+## Submit data
 
-1. Cloudflare creates a copy of this repository in your GitHub or GitLab account
-2. You provide configuration options:
-   - **Project name** (e.g. "formzero")
-   - **Database name** (e.g. "formzero")
-   - **Auth secret** (use [jwtsecrets.com](https://jwtsecrets.com) or `openssl rand -hex 16` to generate one)
-3. Cloudflare builds and deploys FormZero to your account
-4. You get a unique URL (e.g. `https://formzero.your-domain.workers.dev`) to access your dashboard
+Create a form in the dashboard and open its **Integration** page. Copy the endpoint and integration example for your site.
 
-Read the [Cloudflare documentation](https://developers.cloudflare.com/workers/platform/deploy-buttons/) for more details.
+- For an HTML form, set `method="POST"` and set `action` to the copied endpoint. Give each submitted input a `name`.
+- For JavaScript, send a POST request to the endpoint with `Content-Type: application/json` and a JSON body.
+- URL-encoded and multipart form submissions are also accepted. Uploaded file contents are not stored; file fields are currently serialized as empty objects.
 
-<br/>
+The submission API accepts requests from other origins without a dashboard session. Successful JSON requests, or successful requests with `Accept: application/json`, receive a `201` response containing `success: true` and the submission `id`.
 
-### Update Your Deployment
+Successful HTML submissions redirect to the endpoint's `redirect` query parameter when supplied, otherwise to the referring page, or to `/success` if neither is present. Use your site's thank-you page as the redirect URL.
 
-New features are added regularly. To pull them in, redeploy with the ***Deploy to Cloudflare*** button and connect the new Worker to your existing database — ***your forms, submissions, and endpoint URLs are all preserved***:
+## Tech stack
 
-1. In your Cloudflare dashboard, rename your existing Worker to `<your-project-name>-backup` — this frees the original name
-2. Delete the GitHub repository created by your previous deployment (it has the same name as the Worker)
-3. Click the ***Deploy to Cloudflare*** button above and use:
-    - The ***same project name and database name*** as before
-    - Your ***existing database*** when Cloudflare offers to connect to one
-    - A new auth secret (generate one via [jwtsecrets.com](https://jwtsecrets.com) or `openssl rand -hex 16`)
-4. Once the new Worker is live and you have confirmed everything works, delete the backup
+- SvelteKit 3 and Svelte 5, with remote functions for application queries and mutations.
+- Tailwind CSS 4 and shadcn-svelte components.
+- better-auth for authentication.
+- Cloudflare Workers and D1 for hosting and storage.
+- Vite 8, TypeScript 6, and Playwright for tooling and end-to-end tests.
 
-Websites submitting to your form endpoints keep working unchanged. You'll be signed out of the dashboard because of the new auth secret - sign back in with your existing credentials.
+## Local development
 
-<br/>
+Use Node.js 22.17 or newer and npm. `.node-version` selects Node 22; use an up-to-date release in that line. SvelteKit 3 requires Node 22.17 or newer, Vite 8, and TypeScript 6. The required package versions are declared in `package.json` and locked in `package-lock.json`.
 
-## Tech Stack 🛠️
+Install dependencies from the repository root:
 
-- **[Cloudflare Workers](https://workers.cloudflare.com/)** + **[D1](https://developers.cloudflare.com/d1/)**
-- **[React Router v7](https://reactrouter.com/)**
-- **[Tailwind CSS](https://tailwindcss.com/)** + **[shadcn/ui](https://ui.shadcn.com/)**
+```sh
+npm ci
+```
 
-<br/>
+Create an ignored `.dev.vars` file in the repository root. Set this value to a random secret of at least 32 characters:
 
-## Contributing 🤝
+```dotenv
+BETTER_AUTH_SECRET=
+```
 
-Contributions are welcome - add features you need or fix bugs by opening an issue or submitting a pull request.
+Apply migrations to the local D1 database:
 
-<br/>
+```sh
+npm run migrate -- --local
+```
+
+Start the app:
+
+```sh
+npm run dev
+```
+
+Open http://localhost:5473. The dev script builds the SvelteKit app and then serves it with Wrangler on the fixed port 5473. Restart it after source changes to rebuild. Local D1 data lives under `.wrangler/` and is separate from the remote database.
+
+Create the first account through signup, then create a form. For optional sample submissions, seed the local database once after applying migrations:
+
+```sh
+npm run seed -- --local
+```
+
+The seed inserts a test form and submissions with fixed IDs. Repeating it can fail on duplicate IDs.
+
+## Build and checks
+
+Build the Cloudflare Worker and static assets into `.svelte-kit/cloudflare/`:
+
+```sh
+npm run build
+```
+
+Generate Cloudflare binding types, sync SvelteKit, and check Svelte and TypeScript with warnings treated as failures:
+
+```sh
+npm run typecheck
+```
+
+Install the Chromium browser used by Playwright:
+
+```sh
+npx playwright install chromium
+```
+
+Run the end-to-end suite:
+
+```sh
+npm run test:e2e
+```
+
+Playwright builds the app, resets and migrates its own local D1 database in `.wrangler/e2e`, and starts Wrangler with a test-only auth secret. It does not reuse an existing server. Stop the development server first, or select a separate port with `E2E_PORT`:
+
+```sh
+E2E_PORT=5474 npm run test:e2e
+```
+
+The suite covers signup and login, the dashboard, submission API contracts, CSV exports, and cross-site request checks.
+
+## Add UI components
+
+Use the shadcn-svelte CLI version declared in `package.json`. For example, to add the checkbox component:
+
+```sh
+npx shadcn-svelte@1.8.1 add checkbox
+```
+
+The CLI reads `components.json` and copies component source into `src/lib/components/ui/`.
+
+## Project layout
+
+|Path|Contents|
+|-|-|
+|`src/routes/`|SvelteKit pages, layouts, the public submission API, and CSV export route|
+|`src/lib/server/`|Server-only authentication, database queries, submissions, and email delivery|
+|`src/lib/*.remote.ts`|Remote functions for authentication, forms, settings, and submissions|
+|`src/lib/components/`|Application components|
+|`src/lib/components/ui/`|shadcn-svelte component source|
+|`src/hooks.server.ts`|Session handling, better-auth integration, and cross-site write checks|
+|`src/app.css`|Tailwind styles and theme tokens|
+|`static/`|Favicons and other static assets|
+|`migrations/`|D1 SQL migrations|
+|`seed.sql`|Optional local sample data|
+|`tests/`|Playwright tests and isolated database setup|
+|`vite.config.ts`|SvelteKit, Cloudflare adapter, remote functions, and Tailwind configuration|
+|`wrangler.jsonc`|Worker configuration and D1 binding|
+
+## Contributing
+
+Contributions are welcome. Open an issue or pull request in [this fork](https://github.com/mrgnw/formzero). Run the typecheck and end-to-end checks before submitting code changes.
 
 ## License
 
-MIT
-
+[MIT](LICENSE)
