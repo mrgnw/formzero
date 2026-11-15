@@ -55,7 +55,7 @@ export function canKeepPassword(
 	);
 }
 
-export const SMTP_PORTS = [25, 465, 587, 2525];
+export const SMTP_PORTS = [465, 587, 2525];
 
 export const notificationSettingsSchema = v.object({
 	intent: v.picklist(['test', 'save']),
@@ -69,6 +69,6 @@ export const notificationSettingsSchema = v.object({
 	smtp_host: v.pipe(v.string(), v.trim(), v.nonEmpty('SMTP host is required')),
 	smtp_port: v.pipe(
 		v.number('SMTP port is required'),
-		v.check((port) => SMTP_PORTS.includes(port), 'Use SMTP port 25, 465, 587 or 2525')
+		v.check((port) => SMTP_PORTS.includes(port), 'Use SMTP port 465, 587 or 2525')
 	)
 });

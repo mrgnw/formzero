@@ -1,3 +1,4 @@
+import { createServer } from "node:net";
 import { type Page, expect, request as playwrightRequest, test } from "@playwright/test";
 import { authedRequest, credentials, d1, emptyStorageState, firstForm, origin, originHeaders, postSubmission, storageStatePath } from "./support";
 
@@ -311,7 +312,7 @@ test.describe("notification settings", () => {
 	test("a blank password is refused when the host or port changes", async ({ page }) => {
 		seedSettings("127.0.0.1", 2525);
 		const dialog = await openSettings(page);
-		await dialog.getByLabel("SMTP Port").fill("25");
+		await dialog.getByLabel("SMTP Port").fill("587");
 
 		const sendTest = dialog.getByRole("button", { name: "Send test email" });
 		await expect(sendTest).toBeDisabled();
@@ -372,7 +373,7 @@ test.describe("notification settings", () => {
 		await dialog.getByLabel("SMTP Host").fill("127.0.0.1");
 		await dialog.getByLabel("SMTP Port").fill("22");
 		await dialog.getByRole("button", { name: "Send test email" }).click();
-		await expect(dialog.getByText("Use SMTP port 25, 465, 587 or 2525")).toBeVisible();
+		await expect(dialog.getByText("Use SMTP port 465, 587 or 2525")).toBeVisible();
 		await expect(dialog.getByText(connectError)).toHaveCount(0);
 
 		d1("DELETE FROM settings");
@@ -396,6 +397,24 @@ test.describe("notification settings", () => {
 		expect(response.status()).toBeLessThan(500);
 		await owner.dispose();
 		expect(d1("SELECT id FROM settings")).toHaveLength(0);
+	});
+
+	test("a saved row with a port outside the allowlist never connects when a submission arrives", async ({ request }) => {
+		let connections = 0;
+		const server = createServer((socket) => {
+			connections++;
+			socket.destroy();
+		});
+		const port = await new Promise<number>((resolve) => server.listen(0, "127.0.0.1", () => resolve((server.address() as { port: number }).port)));
+		try {
+			seedSettings("127.0.0.1", port);
+			await postSubmission(request, firstForm.id, { email: "probe@example.com" });
+			await new Promise((resolve) => setTimeout(resolve, 1000));
+		} finally {
+			server.close();
+			d1("DELETE FROM settings");
+		}
+		expect(connections).toBe(0);
 	});
 
 	test("disable notifications clears a seeded row", async ({ page }) => {

@@ -6,6 +6,7 @@ import { clearSettings, getSettingsRow, saveSettings, toPublicSettings } from '#
 import { canKeepPassword, notificationSettingsSchema } from '#lib/smtp.js';
 
 const TEST_EMAIL_ERRORS = {
+	port: 'Use SMTP port 465, 587 or 2525.',
 	connect: 'Could not connect to the SMTP server. Check the host and port.',
 	auth: 'The SMTP server rejected the email or password.',
 	tls: 'Could not set up a secure (TLS) connection with the SMTP server.',
@@ -14,6 +15,7 @@ const TEST_EMAIL_ERRORS = {
 };
 
 function testEmailError({ code, command, responseCode }: SmtpFailure = {}) {
+	if (code === 'EPORT') return TEST_EMAIL_ERRORS.port;
 	if (code === 'EAUTH' || responseCode === 535) return TEST_EMAIL_ERRORS.auth;
 	if (code === 'ETLS' || command === 'STARTTLS') return TEST_EMAIL_ERRORS.tls;
 	if (code === 'ETIMEDOUT' || code === 'ETIMEOUT') return TEST_EMAIL_ERRORS.timeout;

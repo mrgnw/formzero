@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer"
 import type { EmailConfig, SubmissionEmailData } from "#lib/types.js"
+import { SMTP_PORTS } from "../smtp.js"
 
 /**
  * Sends a test email to verify SMTP settings
@@ -91,6 +92,9 @@ export async function sendTestEmail(
 }
 
 export function smtpTransportOptions(config: EmailConfig) {
+  if (!SMTP_PORTS.includes(config.smtp_port)) {
+    throw Object.assign(new Error("SMTP port not allowed"), { code: "EPORT" })
+  }
   const implicitTls = config.smtp_port === 465
   return {
     host: config.smtp_host,

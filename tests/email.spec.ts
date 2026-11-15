@@ -19,13 +19,13 @@ function plaintextSmtpServer(commands: string[]) {
 	});
 }
 
-function listen(server: Server) {
-	return new Promise<number>((resolve) => server.listen(0, "127.0.0.1", () => resolve((server.address() as { port: number }).port)));
+function listen(server: Server, port = 0) {
+	return new Promise<number>((resolve) => server.listen(port, "127.0.0.1", () => resolve((server.address() as { port: number }).port)));
 }
 
 test("port 465 uses implicit TLS and other ports require STARTTLS", () => {
 	expect(smtpTransportOptions({ ...account, smtp_port: 465 })).toMatchObject({ secure: true, requireTLS: false });
-	for (const port of [25, 587, 2525]) {
+	for (const port of [587, 2525]) {
 		expect(smtpTransportOptions({ ...account, smtp_port: port })).toMatchObject({ secure: false, requireTLS: true });
 	}
 });
@@ -34,7 +34,7 @@ test("a server without STARTTLS never receives the credentials", async () => {
 	const commands: string[] = [];
 	const server = plaintextSmtpServer(commands);
 	try {
-		const result = await sendTestEmail({ ...account, smtp_port: await listen(server) });
+		const result = await sendTestEmail({ ...account, smtp_port: await listen(server, 2525) });
 		expect(result.success).toBe(false);
 		expect(result.failure).toMatchObject({ code: "ETLS", command: "STARTTLS" });
 		expect(commands.some((command) => /^AUTH/i.test(command))).toBe(false);
@@ -60,7 +60,7 @@ test("SMTP failures are logged as classified fields, not raw server responses", 
 	const original = console.error;
 	console.error = (...args: unknown[]) => logged.push(args);
 	try {
-		const config = { ...account, smtp_port: await listen(server) };
+		const config = { ...account, smtp_port: await listen(server, 2525) };
 		await sendTestEmail(config);
 		await sendSubmissionNotification(config, { id: "sub-1", formId: "f", formName: "F", data: {}, createdAt: 0 });
 	} finally {
@@ -71,4 +71,22 @@ test("SMTP failures are logged as classified fields, not raw server responses", 
 		["Error sending test email:", { code: "ETLS", command: "STARTTLS", responseCode: 502 }],
 		["Error sending notification email:", { code: "ETLS", command: "STARTTLS", responseCode: 502 }],
 	]);
+});
+
+test("ports outside the allowlist are refused before any connection", async () => {
+	expect(() => smtpTransportOptions({ ...account, smtp_port: 25 })).toThrow("SMTP port not allowed");
+	let connections = 0;
+	const server = createServer((socket) => {
+		connections++;
+		socket.destroy();
+	});
+	try {
+		const config = { ...account, smtp_port: await listen(server) };
+		expect((await sendTestEmail(config)).failure).toMatchObject({ code: "EPORT" });
+		expect((await sendSubmissionNotification(config, { id: "s", formId: "f", formName: "F", data: {}, createdAt: 0 })).success).toBe(false);
+		expect((await sendTestEmail({ ...account, smtp_port: 25 })).failure).toMatchObject({ code: "EPORT" });
+	} finally {
+		server.close();
+	}
+	expect(connections).toBe(0);
 });
