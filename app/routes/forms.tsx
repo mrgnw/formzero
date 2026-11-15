@@ -54,6 +54,10 @@ export async function action({ request, context }: Route.ActionArgs) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
 
+  if (!id) {
+    return { error: "Form name must contain at least one letter or number" }
+  }
+
   // Check if form with this ID already exists
   const existing = await database
     .prepare("SELECT id FROM forms WHERE id = ?")
