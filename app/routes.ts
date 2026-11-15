@@ -1,10 +1,8 @@
-import { type RouteConfig, index, route } from "@react-router/dev/routes";
+import { type RouteConfig, route } from "@react-router/dev/routes";
 
 export default [
   route("/logout", "routes/logout.tsx"),
 
-  index("routes/home.tsx"),
-  route("setup", "routes/setup.tsx"),
   route("/forms", "routes/forms.tsx", [
     route(":formId", "routes/forms.$formId.tsx", [
       route("submissions", "routes/forms.$formId.submissions.tsx"),

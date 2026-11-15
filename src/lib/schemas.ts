@@ -23,3 +23,7 @@ export const signUpSchema = v.pipe(
 		['_confirmPassword']
 	)
 );
+
+export const createFormSchema = v.object({
+	name: v.pipe(v.string(), v.trim(), v.nonEmpty('Form name is required'))
+});
