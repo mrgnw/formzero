@@ -4,74 +4,86 @@
 	import ArrowUp from '@lucide/svelte/icons/arrow-up';
 	import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
+	import { page } from '$app/state';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import * as Table from '#lib/components/ui/table/index.js';
-	import type { Submission } from '#lib/server/dashboard.js';
+	import type { Direction, Sort, SortKey, Submission, SubmissionPage } from '#lib/server/dashboard.js';
 	import { exactTime, timeAgo } from '#lib/time.js';
 
-	type SortKey = 'created_at' | 'email';
-	type Direction = 'ascending' | 'descending';
-
 	let {
-		submissions,
+		table,
+		query,
+		sort,
+		total,
 		now,
 		toolbar,
 		onDelete
 	}: {
-		submissions: Submission[];
+		table: SubmissionPage;
+		query: string;
+		sort: Sort;
+		total: number;
 		now: number;
 		toolbar?: Snippet;
 		onDelete: (submission: Submission) => void;
 	} = $props();
 
-	const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+	const SORT_PARAMS: Record<SortKey, string> = { created_at: 'time', email: 'email' };
 
-	let query = $state('');
-	let sort = $state<{ key: SortKey; direction: Direction }>({ key: 'created_at', direction: 'descending' });
-	let announcement = $state('');
+	let searchTimer: ReturnType<typeof setTimeout> | undefined;
 
 	const fields = $derived(
-		[...new Set(submissions.flatMap((submission) => Object.keys(submission.data)))].sort((a, b) => {
+		[...new Set(table.submissions.flatMap((submission) => Object.keys(submission.data)))].sort((a, b) => {
 			if (a === 'email') return -1;
 			if (b === 'email') return 1;
 			return a.localeCompare(b);
 		})
 	);
-	const filtered = $derived.by(() => {
-		if (!query.trim()) return submissions;
-		const needle = query.toLowerCase();
-		return submissions.filter((submission) => JSON.stringify(submission).toLowerCase().includes(needle));
-	});
-	const rows = $derived.by(() => {
-		const factor = sort.direction === 'ascending' ? 1 : -1;
-		return filtered.toSorted((a, b) => factor * compare(a, b, sort.key));
-	});
+	const sortLabel = $derived(sort.key === 'created_at' ? 'Time' : 'Email');
+	const previousPage = $derived(table.page > 1 ? pageHref(table.page - 1) : undefined);
+	const nextPage = $derived(table.page < table.pageCount ? pageHref(table.page + 1) : undefined);
 
 	function text(value: unknown) {
 		return value === undefined || value === null ? '' : String(value);
-	}
-
-	function compare(a: Submission, b: Submission, key: SortKey) {
-		if (key === 'created_at') return a.created_at - b.created_at;
-		return collator.compare(text(a.data.email), text(b.data.email));
 	}
 
 	function heading(field: string) {
 		return field.charAt(0).toUpperCase() + field.slice(1);
 	}
 
-	function toggle(key: SortKey, label: string) {
-		const direction: Direction =
-			sort.key === key && sort.direction === 'ascending' ? 'descending' : 'ascending';
-		sort = { key, direction };
-		announcement = `Sorted by ${label}, ${direction}`;
+	function href(changes: Record<string, string | null>) {
+		const url = new URL(page.url.href);
+		for (const [name, value] of Object.entries(changes)) {
+			if (value === null) url.searchParams.delete(name);
+			else url.searchParams.set(name, value);
+		}
+		return url.pathname + url.search;
+	}
+
+	function pageHref(target: number) {
+		return href({ page: target === 1 ? null : String(target) });
+	}
+
+	function sortParam(key: SortKey, direction: Direction) {
+		return `${direction === 'descending' ? '-' : ''}${SORT_PARAMS[key]}`;
+	}
+
+	function sortHref(key: SortKey) {
+		const direction = sort.key === key && sort.direction === 'ascending' ? 'descending' : 'ascending';
+		return href({ sort: sortParam(key, direction), page: null });
+	}
+
+	function search(event: Event & { currentTarget: HTMLFormElement }) {
+		const form = event.currentTarget;
+		clearTimeout(searchTimer);
+		searchTimer = setTimeout(() => form.requestSubmit(), 250);
 	}
 </script>
 
 {#snippet sortableHead(key: SortKey, label: string)}
 	<Table.Head aria-sort={sort.key === key ? sort.direction : undefined} class="px-0">
-		<Button variant="ghost" onclick={() => toggle(key, label)}>
+		<Button variant="ghost" href={sortHref(key)}>
 			{label}
 			{#if sort.key !== key}
 				<ArrowUpDown class="size-4" aria-hidden="true" />
@@ -84,9 +96,20 @@
 	</Table.Head>
 {/snippet}
 
-<div class="min-w-0 space-y-2">
+<div class="min-w-0 space-y-2" data-sveltekit-reset="false">
 	<div class="flex items-center justify-between gap-2">
-		<Input type="search" bind:value={query} placeholder="Search submissions..." aria-label="Search submissions" class="max-w-sm" />
+		<form
+			method="GET"
+			role="search"
+			class="w-full max-w-sm"
+			data-sveltekit-replacestate
+			oninput={search}
+		>
+			<Input type="search" name="q" defaultValue={query} placeholder="Search submissions..." aria-label="Search submissions" />
+			{#if sort.key !== 'created_at' || sort.direction !== 'descending'}
+				<input type="hidden" name="sort" value={sortParam(sort.key, sort.direction)} />
+			{/if}
+		</form>
 		{@render toolbar?.()}
 	</div>
 	<div class="rounded-md border">
@@ -106,7 +129,7 @@
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
-				{#each rows as submission (submission.id)}
+				{#each table.submissions as submission (submission.id)}
 					<Table.Row>
 						<Table.Cell>
 							<time
@@ -144,10 +167,17 @@
 			</Table.Body>
 		</Table.Root>
 	</div>
-	<p class="text-sm text-muted-foreground">
-		{filtered.length === submissions.length
-			? `${submissions.length} total submission(s)`
-			: `${filtered.length} of ${submissions.length} submission(s)`}
-	</p>
-	<p class="sr-only" role="status">{announcement}</p>
+	<div class="flex items-center justify-between gap-2">
+		<p class="text-sm text-muted-foreground">
+			{query ? `${table.matching} of ${total} submission(s)` : `${total} total submission(s)`}
+		</p>
+		{#if table.pageCount > 1}
+			<nav aria-label="Pagination" class="flex items-center gap-2">
+				<span class="text-sm text-muted-foreground">Page {table.page} of {table.pageCount}</span>
+				<Button variant="outline" size="sm" href={previousPage ?? '#'} disabled={!previousPage}>Previous</Button>
+				<Button variant="outline" size="sm" href={nextPage ?? '#'} disabled={!nextPage}>Next</Button>
+			</nav>
+		{/if}
+	</div>
+	<p class="sr-only" role="status">Sorted by {sortLabel}, {sort.direction}</p>
 </div>

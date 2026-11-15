@@ -67,13 +67,13 @@ test("sort by time and by email", async ({ page }) => {
 	await page.goto(`/forms/${firstForm.id}/submissions`);
 	await expectRowOrder(page, timeNewestFirst);
 
-	await page.getByRole("button", { name: "Time" }).click();
+	await page.getByRole("link", { name: "Time" }).click();
 	await expectRowOrder(page, [...timeNewestFirst].reverse());
 
-	await page.getByRole("button", { name: "Email" }).click();
+	await page.getByRole("link", { name: "Email" }).click();
 	await expectRowOrder(page, ["alpha@example.com", "bravo@example.com", "charlie@example.com"]);
 
-	await page.getByRole("button", { name: "Email" }).click();
+	await page.getByRole("link", { name: "Email" }).click();
 	await expectRowOrder(page, ["charlie@example.com", "bravo@example.com", "alpha@example.com"]);
 });
 
@@ -415,4 +415,116 @@ test("stored rows that are not JSON objects never break the page or the CSV", as
 		rows.map((_, index) => `bad-${index},${new Date(1700000000000 + index).toISOString()},${index === 5 ? "valid@example.com" : ""}`).reverse(),
 	);
 	await owner.dispose();
+});
+
+function seedSubmissions(formId: string, count: number) {
+	const start = Date.now() - count * 60_000;
+	const values = Array.from({ length: count }, (_, index) => {
+		const n = String(index).padStart(3, "0");
+		return `('${formId}-${n}', '${formId}', '{"email":"user${n}@example.com","name":"User ${n}"}', ${start + index * 60_000})`;
+	});
+	d1(`INSERT INTO submissions (id, form_id, data, created_at) VALUES ${values.join(", ")}`);
+}
+
+const dataRows = (page: Page) => page.getByRole("row").filter({ hasText: "@example.com" });
+
+test("the table pages 50 rows at a time with search and sort in the URL", async ({ page }) => {
+	const formId = createForm("Paged Form");
+	seedSubmissions(formId, 120);
+
+	await page.goto(`/forms/${formId}/submissions`);
+	await expect(page.getByText("120 total submission(s)")).toBeVisible();
+	await expect(page.getByText("Page 1 of 3")).toBeVisible();
+	await expect(dataRows(page)).toHaveCount(50);
+	await expect(dataRows(page).first()).toContainText("user119@example.com");
+	await expect(page.getByRole("columnheader", { name: "Time" })).toHaveAttribute("aria-sort", "descending");
+	await expect(page.getByRole("columnheader", { name: "Email" })).not.toHaveAttribute("aria-sort");
+
+	await page.getByRole("link", { name: "Next" }).click();
+	await expect(page).toHaveURL(`/forms/${formId}/submissions?page=2`);
+	await expect(dataRows(page).first()).toContainText("user069@example.com");
+	await page.getByRole("link", { name: "Next" }).click();
+	await expect(page.getByText("Page 3 of 3")).toBeVisible();
+	await expect(dataRows(page)).toHaveCount(20);
+	await expect(page.getByRole("link", { name: "Next" })).not.toHaveAttribute("href");
+
+	await page.getByRole("link", { name: "Email" }).click();
+	await expect(page).toHaveURL(`/forms/${formId}/submissions?sort=email`);
+	await expect(page.getByRole("columnheader", { name: "Email" })).toHaveAttribute("aria-sort", "ascending");
+	await expect(page.getByRole("columnheader", { name: "Time" })).not.toHaveAttribute("aria-sort");
+	await expect(dataRows(page).first()).toContainText("user000@example.com");
+
+	await page.getByRole("searchbox", { name: "Search submissions" }).fill("user11");
+	await expect(page.getByText("10 of 120 submission(s)")).toBeVisible();
+	await expect(page).toHaveURL(`/forms/${formId}/submissions?q=user11&sort=email`);
+	await expect(page.getByRole("searchbox", { name: "Search submissions" })).toBeFocused();
+	await expect(dataRows(page).first()).toContainText("user110@example.com");
+	await expect(page.getByText("Page 1 of")).toHaveCount(0);
+
+	await page.goto(`/forms/${formId}/submissions?page=99`);
+	await expect(page).toHaveURL(`/forms/${formId}/submissions?page=3`);
+});
+
+test.describe("without JavaScript", () => {
+	test.use({ javaScriptEnabled: false });
+
+	test("paging, sorting and searching work as plain links and a GET form", async ({ page }) => {
+		const formId = "paged-form";
+		await page.goto(`/forms/${formId}/submissions`);
+		await page.getByRole("link", { name: "Next" }).click();
+		await expect(page).toHaveURL(`/forms/${formId}/submissions?page=2`);
+		await expect(page.getByText("Page 2 of 3")).toBeVisible();
+
+		await page.getByRole("link", { name: "Time" }).click();
+		await expect(page).toHaveURL(`/forms/${formId}/submissions?sort=time`);
+		await expect(dataRows(page).first()).toContainText("user000@example.com");
+
+		await page.getByRole("searchbox", { name: "Search submissions" }).fill("user042");
+		await page.getByRole("searchbox", { name: "Search submissions" }).press("Enter");
+		await expect(page).toHaveURL(`/forms/${formId}/submissions?q=user042&sort=time`);
+		await expect(page.getByText("1 of 120 submission(s)")).toBeVisible();
+	});
+});
+
+test("deleting the only row on the last page lands on the new last page", async ({ page }) => {
+	const formId = createForm("Delete Paged");
+	seedSubmissions(formId, 101);
+
+	await page.goto(`/forms/${formId}/submissions?page=3`);
+	await expect(dataRows(page)).toHaveCount(1);
+	await dataRows(page).getByRole("button", { name: "Delete submission" }).click();
+	await page.getByRole("dialog", { name: "Delete submission?" }).getByRole("button", { name: "Delete", exact: true }).click();
+
+	await expect(page).toHaveURL(`/forms/${formId}/submissions?page=2`);
+	await expect(page.getByText("100 total submission(s)")).toBeVisible();
+	await expect(page.getByText("Page 2 of 2")).toBeVisible();
+	await expect(dataRows(page)).toHaveCount(50);
+});
+
+test("invalid stored rows can be searched and sorted by email", async ({ page }) => {
+	const response = await page.goto("/forms/invalid-rows/submissions?sort=-email&q=valid");
+	expect(response?.status()).toBe(200);
+	await expect(page.getByRole("cell", { name: "valid@example.com" })).toBeVisible();
+	expect((await page.goto("/forms/invalid-rows/submissions?sort=email"))?.status()).toBe(200);
+	await expect(page.getByText("6 total submission(s)")).toBeVisible();
+});
+
+test("CSV export streams in batches and stops at 100,000 rows", async () => {
+	const formId = createForm("CSV Cap");
+	d1(
+		`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 100001)
+		INSERT INTO submissions (id, form_id, data, created_at) SELECT printf('cap-%06d', i), '${formId}', '{"n":' || i || '}', i FROM n`,
+	);
+	const owner = await authedRequest();
+	const response = await owner.get(`/forms/${formId}/submissions.csv`, { timeout: 120_000 });
+	expect(response.status()).toBe(200);
+	const lines = (await response.text()).split("\n");
+	await owner.dispose();
+
+	expect(lines).toHaveLength(100_001);
+	expect(lines[0]).toBe("ID,Created At,n");
+	expect(lines[1]).toBe(`cap-100001,${new Date(100001).toISOString()},100001`);
+	expect(lines[1000]).toBe(`cap-099002,${new Date(99002).toISOString()},99002`);
+	expect(lines[1001]).toBe(`cap-099001,${new Date(99001).toISOString()},99001`);
+	expect(lines.at(-1)).toBe(`cap-000002,${new Date(2).toISOString()},2`);
 });
