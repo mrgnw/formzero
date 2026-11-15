@@ -18,7 +18,7 @@ import {
 export const meta: Route.MetaFunction = () => {
   return [
     { title: "Integration | FormZero" },
-    { name: "description", content: "Integrate your form with HTML, JavaScript, or React" },
+    { name: "description", content: "Integrate your form with HTML, JavaScript, React, or Svelte" },
   ];
 };
 
@@ -132,6 +132,117 @@ function ContactForm() {
   )
 }`
 
+  const svelteFetchExample = `<script lang="ts">
+  let status = $state<'idle' | 'sending' | 'sent' | 'error'>('idle')
+
+  async function handleSubmit(event: SubmitEvent) {
+    event.preventDefault()
+    const form = event.currentTarget as HTMLFormElement
+    status = 'sending'
+
+    try {
+      const response = await fetch('${formEndpoint}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Object.fromEntries(new FormData(form)))
+      })
+      status = response.ok ? 'sent' : 'error'
+      if (response.ok) form.reset()
+    } catch {
+      status = 'error'
+    }
+  }
+</script>
+
+<form onsubmit={handleSubmit}>
+  <input type="text" name="name" placeholder="Your Name" required />
+  <input type="email" name="email" placeholder="Your Email" required />
+  <textarea name="message" placeholder="Your Message"></textarea>
+  <button type="submit" disabled={status === 'sending'}>
+    {status === 'sending' ? 'Sending...' : 'Submit'}
+  </button>
+  {#if status === 'sent'}<p>Message sent successfully!</p>{/if}
+  {#if status === 'error'}<p>Error sending message. Please try again.</p>{/if}
+</form>`
+
+  const svelteRemoteExample = `// contact.remote.ts
+import { form } from '$app/server'
+import { error } from '@sveltejs/kit'
+import * as v from 'valibot'
+
+export const contact = form(
+  v.object({
+    name: v.pipe(v.string(), v.nonEmpty()),
+    email: v.pipe(v.string(), v.email()),
+    message: v.optional(v.string(), '')
+  }),
+  async (data) => {
+    const response = await fetch('${formEndpoint}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(data)
+    })
+    if (!response.ok) error(502, 'Could not send message')
+    return { success: true }
+  }
+)`
+
+  const svelteRemoteComponentExample = `<script lang="ts">
+  import { contact } from './contact.remote'
+</script>
+
+<form {...contact}>
+  <input {...contact.fields.name.as('text')} placeholder="Your Name" required />
+  <input {...contact.fields.email.as('email')} placeholder="Your Email" required />
+  <textarea {...contact.fields.message.as('text')} placeholder="Your Message"></textarea>
+  <button disabled={!!contact.pending}>Submit</button>
+  {#if contact.result?.success}<p>Message sent successfully!</p>{/if}
+</form>`
+
+  const renderCodeBlock = (code: string, language: string) => (
+    <div className="relative">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => handleCopyCode(code)}
+        className="absolute top-2 right-2 z-10 h-7 px-2 text-xs"
+      >
+        {copiedCode ? (
+          <Check className="h-3 w-3" />
+        ) : (
+          <Copy className="h-3 w-3" />
+        )}
+      </Button>
+      <Highlight
+        theme={themes.vsDark}
+        code={code}
+        language={language}
+      >
+        {({ className, style, tokens, getLineProps, getTokenProps }) => (
+          <pre
+            className={className}
+            style={{
+              ...style,
+              margin: 0,
+              borderRadius: "0.375rem",
+              fontSize: "0.75rem",
+              padding: "0.75rem",
+              overflowX: "auto",
+            }}
+          >
+            {tokens.map((line, i) => (
+              <div key={i} {...getLineProps({ line })}>
+                {line.map((token, key) => (
+                  <span key={key} {...getTokenProps({ token })} />
+                ))}
+              </div>
+            ))}
+          </pre>
+        )}
+      </Highlight>
+    </div>
+  )
+
   return (
     <div className="flex flex-1 flex-col gap-3">
       <Card>
@@ -181,6 +292,7 @@ function ContactForm() {
               <TabsTrigger value="html">HTML</TabsTrigger>
               <TabsTrigger value="javascript">JavaScript</TabsTrigger>
               <TabsTrigger value="react">React</TabsTrigger>
+              <TabsTrigger value="svelte">Svelte</TabsTrigger>
             </TabsList>
 
             <TabsContent value="html" className="mt-3 space-y-3">
@@ -345,6 +457,30 @@ function ContactForm() {
                     </pre>
                   )}
                 </Highlight>
+              </div>
+            </TabsContent>
+            <TabsContent value="svelte" className="mt-3 space-y-4">
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium">Plain form</h3>
+                <p className="text-xs text-muted-foreground">
+                  The HTML form is a valid <code className="rounded bg-muted px-1 py-0.5 text-xs">.svelte</code> file as is. It does a full-page POST and uses the redirect URL from the HTML tab.
+                </p>
+                {renderCodeBlock(htmlExample, "markup")}
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium">Svelte 5 with fetch</h3>
+                <p className="text-xs text-muted-foreground">
+                  Submits JSON without leaving the page and tracks status with <code className="rounded bg-muted px-1 py-0.5 text-xs">$state</code>.
+                </p>
+                {renderCodeBlock(svelteFetchExample, "markup")}
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium">SvelteKit remote function (experimental)</h3>
+                <p className="text-xs text-muted-foreground">
+                  The server forwards the submission, so the browser never makes a cross-origin request. Needs <code className="rounded bg-muted px-1 py-0.5 text-xs">kit.experimental.remoteFunctions</code> and <code className="rounded bg-muted px-1 py-0.5 text-xs">compilerOptions.experimental.async</code> in <code className="rounded bg-muted px-1 py-0.5 text-xs">svelte.config.js</code>, plus <code className="rounded bg-muted px-1 py-0.5 text-xs">valibot</code>.
+                </p>
+                {renderCodeBlock(svelteRemoteExample, "typescript")}
+                {renderCodeBlock(svelteRemoteComponentExample, "markup")}
               </div>
             </TabsContent>
           </Tabs>
