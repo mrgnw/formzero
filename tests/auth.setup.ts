@@ -16,3 +16,16 @@ setup("first signup creates the account and signs in", async ({ page }) => {
 
 	await page.context().storageState({ path: storageStatePath });
 });
+
+setup("signed in with no forms, / and /forms lead to /setup", async ({ browser }) => {
+	const context = await browser.newContext({ storageState: storageStatePath });
+	const page = await context.newPage();
+
+	await page.goto("/");
+	await expect(page).toHaveURL(/\/setup$/);
+
+	await page.goto("/forms");
+	await expect(page).toHaveURL(/\/setup$/);
+
+	await context.close();
+});
