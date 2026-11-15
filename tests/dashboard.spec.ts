@@ -399,6 +399,33 @@ test.describe("notification settings", () => {
 		expect(d1("SELECT id FROM settings")).toHaveLength(0);
 	});
 
+	test("the TLS note shows only for saved settings and a server without STARTTLS gets the TLS required message", async ({ page }) => {
+		const note = 'Email now requires TLS (STARTTLS, or implicit TLS on port 465). Use "Send test email" to confirm your saved settings still work.';
+		d1("DELETE FROM settings");
+		let dialog = await openSettings(page);
+		await expect(dialog.getByText(note)).toHaveCount(0);
+
+		const server = createServer((socket) => {
+			socket.write("220 plaintext.test ESMTP\r\n");
+			socket.on("data", (chunk) => {
+				for (const line of chunk.toString().split("\r\n").filter(Boolean)) {
+					if (/^EHLO/i.test(line)) socket.write("250-plaintext.test\r\n250 AUTH PLAIN\r\n");
+					else socket.write("502 not implemented\r\n");
+				}
+			});
+		});
+		await new Promise<void>((resolve) => server.listen(2525, "127.0.0.1", resolve));
+		try {
+			seedSettings("127.0.0.1", 2525);
+			dialog = await openSettings(page);
+			await expect(dialog.getByText(note)).toBeVisible();
+			await dialog.getByRole("button", { name: "Send test email" }).click();
+			await expect(dialog.getByText(/^TLS required:/)).toBeVisible();
+		} finally {
+			server.close();
+		}
+	});
+
 	test("a saved row with a port outside the allowlist never connects when a submission arrives", async ({ request }) => {
 		let connections = 0;
 		const server = createServer((socket) => {

@@ -72,6 +72,12 @@
 	</Card.Header>
 	<Card.Content>
 		<form {...enhanced} class="space-y-4">
+			{#if saved}
+				<p class="text-sm text-muted-foreground">
+					Email now requires TLS (STARTTLS, or implicit TLS on port 465). Use "Send test email" to confirm your
+					saved settings still work.
+				</p>
+			{/if}
 			<div class="space-y-2">
 				<Label for="notification-email" class="flex items-center gap-2">
 					<Mail class="size-4" />

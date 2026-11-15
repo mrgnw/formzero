@@ -138,7 +138,11 @@ export async function sendSubmissionNotification(
 
     return { success: true }
   } catch (error) {
-    console.error("Error sending notification email:", smtpFailure(error))
+    const failure = smtpFailure(error)
+    console.error(
+      failure.code === "ETLS" ? "Notification email not sent, TLS required:" : "Error sending notification email:",
+      failure
+    )
 
     let errorMessage = "Failed to send notification email"
     if (error instanceof Error) {
