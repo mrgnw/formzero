@@ -21,3 +21,14 @@ export async function insertForm(id: string, name: string) {
 		.bind(id, name, now, now)
 		.run();
 }
+
+export type FormSummary = { id: string; name: string };
+
+export async function listForms() {
+	const { results } = await env.DB.prepare('SELECT id, name FROM forms ORDER BY created_at ASC').all<FormSummary>();
+	return results;
+}
+
+export async function getForm(id: string) {
+	return env.DB.prepare('SELECT id, name FROM forms WHERE id = ?').bind(id).first<FormSummary>();
+}
