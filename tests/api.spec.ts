@@ -228,4 +228,16 @@ test.describe("CSV export", () => {
 		expect(body.split("\n")[0]).toBe('ID,Created At,"a,""b"');
 		expect(body).toMatch(new RegExp(`\\n${id},[^,]+,"x\\ry"$`));
 	});
+
+	test("cells that start like a formula are prefixed with a single quote", async () => {
+		const { id, body } = await exportCsv("CSV Formulas", {
+			"=x": '=HYPERLINK("https://evil.example","click")',
+			plain: "@SUM(A1)",
+		});
+		const [header, row] = body.split("\n");
+		expect(header).toBe("ID,Created At,'=x,plain");
+		const [rowId, createdAt] = row.split(",");
+		expect(rowId).toBe(id);
+		expect(row).toBe(`${id},${createdAt},"'=HYPERLINK(""https://evil.example"",""click"")",'@SUM(A1)`);
+	});
 });

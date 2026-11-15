@@ -73,10 +73,15 @@ function escapeCsv(value: unknown) {
 	return text;
 }
 
+function userCell(value: unknown) {
+	const text = value === undefined || value === null ? '' : String(value);
+	return escapeCsv(/^[=+\-@\t\r]/.test(text) ? `'${text}` : text);
+}
+
 export function submissionsCsv(submissions: Submission[]) {
 	const dataKeys = [...new Set(submissions.flatMap((s) => Object.keys(s.data)))].sort();
 	const rows = submissions.map((s) =>
-		[escapeCsv(s.id), escapeCsv(new Date(s.created_at).toISOString()), ...dataKeys.map((key) => escapeCsv(s.data[key]))].join(',')
+		[escapeCsv(s.id), escapeCsv(new Date(s.created_at).toISOString()), ...dataKeys.map((key) => userCell(s.data[key]))].join(',')
 	);
-	return [['ID', 'Created At', ...dataKeys.map(escapeCsv)].join(','), ...rows].join('\n');
+	return [['ID', 'Created At', ...dataKeys.map(userCell)].join(','), ...rows].join('\n');
 }
