@@ -509,15 +509,33 @@ Goal: no React left. Profile: Qwen (Hetzner) for commits 1 and 2, a GPT profile 
 
 Then run the suite against a preview bound to a copy of production D1 (`npx wrangler d1 export` into a preview database), and test the Deploy to Cloudflare button against the fork.
 
+### Stage 9: security review
+
+Goal: review the ported project for the problems stage 0 found, then fix them. Profile: GPT-6.1 Terra audits, a Claude Opus 5.5 agent cross-checks and fixes. Size: about 1 day.
+
+Stage 0 (PR #4, closed, branch `port/s0-security-fixes` kept as reference) is dropped from the critical path. The migration is expected to remove most of its problems, but the code is not assumed fixed. Until each route is ported, these stay live in the React app: `GET /settings/notifications` has no auth check and returns the SMTP password; the test-email route sends the stored password to any submitted `smtp_host`; notification writes have no `Origin` check; an unknown form id returns 500; a form name with an empty slug is accepted.
+
+Scope:
+
+- Every loader, remote function and API route: auth is checked before any data is read or written.
+- No secret (SMTP password, auth secret, session data) reaches the browser through load data, remote function results, props or serialized state.
+- Stored credentials are never reused for a user-supplied destination (host, port, URL, address).
+- State-changing routes reject cross-origin requests; the public submission API's exemption (`/api/forms/`) is intentional and documented. An empty `Origin` counts as cross-origin.
+- Unknown ids and malformed or empty input produce 404 or a validation error, never 500.
+- Public submission API abuse: size limits, spam, rate limiting, who can read submissions.
+- Email: header or template injection from form fields.
+
+Method: the audit agent reports findings ranked by severity with file and line; a second agent from the other model family cross-checks; each fix is its own commit with a Playwright test. Un-skip the two `test.fixme` cases from stage 1 (signed-out `/settings/notifications`, unknown form `/forms/no-such-form/submissions`) as soon as the ported routes handle them, whatever stage that is.
+
 ### Ordering
 
-Stages 0 and 1 are already running on React. Nothing in this revision changes them.
+Stage 1 is done on React (PR #5). Stage 0 was dropped from the critical path; its fixes are covered by stage 9.
 
 |Stage|Depends on|Parallel with|Ships|
 |-|-|-|-|
-|0 fixes|-|1|main|
-|1 tests|-|0|main|
-|2 host|0, 1|-|main|
+|0 fixes (dropped, see stage 9)|-|-|-|
+|1 tests|-|-|main|
+|2 host|1|-|main|
 |3 server core + components|2|-|main|
 |4 auth pages|3|-|main|
 |5 shell|4|-|main|
@@ -525,6 +543,7 @@ Stages 0 and 1 are already running on React. Nothing in this revision changes th
 |7a form settings|5|6, 7b|main|
 |7b notifications|5|6, 7a|main|
 |8 remove React|6, 7a, 7b|-|main|
+|9 security review|8|-|main|
 
 Total: about 5 to 6 agent-days, of which about 2 run in parallel. Production deploys happen per stage, after the coordinator asks the user (D8).
 
