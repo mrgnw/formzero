@@ -18,6 +18,7 @@ export default defineConfig({
 		{ name: "dashboard", testMatch: /dashboard\.spec\.ts/, dependencies: ["setup"], use: signedIn },
 		{ name: "auth", testMatch: /auth\.spec\.ts/, dependencies: ["setup"], use: signedIn },
 		{ name: "api", testMatch: /api\.spec\.ts/, dependencies: ["setup"], use: signedIn },
+		{ name: "headers", testMatch: /headers\.spec\.ts/, dependencies: ["setup"], use: signedIn },
 		{ name: "csrf", testMatch: /csrf\.spec\.ts/, dependencies: ["setup"], use: signedIn },
 	],
 	webServer: {
