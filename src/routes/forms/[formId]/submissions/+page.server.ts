@@ -1,6 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import { env } from 'cloudflare:workers';
 import { requireUser } from '#lib/server/auth.js';
+import { CSV_MAX_ROWS } from '#lib/server/csv.js';
 import { listSubmissions, MAX_QUERY_LENGTH, parsePage, parseSort } from '#lib/server/dashboard.js';
 import { dailyCounts, submissionStats } from '#lib/server/stats.js';
 import type { PageServerLoad } from './$types';
@@ -21,5 +22,5 @@ export const load: PageServerLoad = async ({ params, url }) => {
 		target.searchParams.set('page', String(table.pageCount));
 		redirect(303, target.pathname + target.search);
 	}
-	return { table, query, sort, now, stats, days };
+	return { table, query, sort, now, stats, days, csvLimit: CSV_MAX_ROWS };
 };

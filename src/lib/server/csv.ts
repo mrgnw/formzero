@@ -52,14 +52,23 @@ async function csvBatch(db: D1Database, formId: string, bound: string, cursor: C
 	return results;
 }
 
-export async function submissionsCsv(db: D1Database, formId: string): Promise<ReadableStream<Uint8Array>> {
+async function exceedsCap(db: D1Database, formId: string, snapshot: Cursor) {
+	const row = await db
+		.prepare(`SELECT COUNT(*) AS rows FROM (SELECT 1 FROM submissions WHERE form_id = ? AND ${UP_TO} LIMIT ?)`)
+		.bind(formId, snapshot.created_at, snapshot.created_at, snapshot.id, CSV_MAX_ROWS + 1)
+		.first<{ rows: number }>();
+	return (row?.rows ?? 0) > CSV_MAX_ROWS;
+}
+
+export async function submissionsCsv(db: D1Database, formId: string) {
 	const snapshot = await newestRow(db, formId);
 	const keys = snapshot ? await csvKeys(db, formId, snapshot) : [];
+	const truncated = snapshot ? await exceedsCap(db, formId, snapshot) : false;
 	const encoder = new TextEncoder();
 	let cursor = snapshot;
 	let bound = UP_TO;
 	let remaining = CSV_MAX_ROWS;
-	return new ReadableStream({
+	const stream = new ReadableStream<Uint8Array>({
 		start(controller) {
 			controller.enqueue(encoder.encode(['ID', 'Created At', ...keys.map(userCell)].join(',')));
 		},
@@ -79,4 +88,5 @@ export async function submissionsCsv(db: D1Database, formId: string): Promise<Re
 			bound = AFTER;
 		}
 	});
+	return { stream, truncated };
 }

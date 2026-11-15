@@ -10,7 +10,8 @@ test("rows inserted after the export starts are excluded from the header and the
 	insert("a", "f", '{"old":"2"}', 2000);
 	insert("x", "other", '{"other":"x"}', 5000);
 
-	const stream = await submissionsCsv(db, "f");
+	const { stream, truncated } = await submissionsCsv(db, "f");
+	expect(truncated).toBe(false);
 	insert("c", "f", '{"late":"same time, later id"}', 2000);
 	insert("d", "f", '{"late":"newer"}', 3000);
 	const body = await new Response(stream).text();
@@ -20,7 +21,7 @@ test("rows inserted after the export starts are excluded from the header and the
 
 test("an empty form exports only the header", async () => {
 	const { db } = sqliteD1();
-	expect(await new Response(await submissionsCsv(db, "f")).text()).toBe("ID,Created At");
+	expect(await new Response((await submissionsCsv(db, "f")).stream).text()).toBe("ID,Created At");
 });
 
 test("the header keeps at most 500 columns and each cell at most 32 KiB", async () => {
@@ -29,7 +30,7 @@ test("the header keeps at most 500 columns and each cell at most 32 KiB", async 
 	insert("wide", "f", JSON.stringify(Object.fromEntries(keys.map((key) => [key, key]))), 1000);
 	insert("long", "f", JSON.stringify({ k000: "=".repeat(40_000), [`z${"x".repeat(40_000)}`]: "dropped" }), 2000);
 
-	const [header, longRow, wideRow] = (await new Response(await submissionsCsv(db, "f")).text()).split("\n");
+	const [header, longRow, wideRow] = (await new Response((await submissionsCsv(db, "f")).stream).text()).split("\n");
 	expect(header).toBe(["ID", "Created At", ...keys.slice(0, 500)].join(","));
 	const longCells = longRow.split(",");
 	expect(longCells[2]).toBe(`'${"=".repeat(32 * 1024)}`);
