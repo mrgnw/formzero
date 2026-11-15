@@ -53,6 +53,14 @@ function getEmailDomain(email: string): string | null {
   return match ? match[1].toLowerCase() : null
 }
 
+function getStoredSmtp(settings: Settings | null) {
+  if (!settings?.has_password) {
+    return null
+  }
+
+  return { host: settings.smtp_host || "", port: settings.smtp_port?.toString() || "" }
+}
+
 type SettingsDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -79,12 +87,14 @@ export function SettingsDialog({ open, onOpenChange, settings }: SettingsDialogP
   const [smtpConfig, setSmtpConfig] = useState<typeof SMTP_CONFIGS[string] | null>(initialConfig)
   const [testPassed, setTestPassed] = useState(false)
   const [testResultValid, setTestResultValid] = useState(true)
+  const [storedSmtp, setStoredSmtp] = useState<{ host: string; port: string } | null>(getStoredSmtp(settings))
 
   // Update form when settings prop changes
   useEffect(() => {
     if (settings) {
       setEmail(settings.notification_email || "")
       setPassword("")
+      setStoredSmtp(getStoredSmtp(settings))
       setSmtpHost(settings.smtp_host || "")
       setSmtpPort(settings.smtp_port?.toString() || "")
     }
@@ -128,7 +138,13 @@ export function SettingsDialog({ open, onOpenChange, settings }: SettingsDialogP
 
   const isClearing = clearFetcher.state === "submitting"
   const isCleared = clearFetcher.state === "idle" && clearFetcher.data?.success
-  const hasStoredPassword = Boolean(settings?.has_password) && !isCleared
+  const hasStoredPassword = storedSmtp?.host === smtpHost && storedSmtp.port === smtpPort
+
+  useEffect(() => {
+    if (fetcher.state === "idle" && fetcher.data?.success) {
+      setStoredSmtp({ host: smtpHost, port: smtpPort })
+    }
+  }, [fetcher.state, fetcher.data])
 
   useEffect(() => {
     if (testSuccess) {
@@ -147,6 +163,7 @@ export function SettingsDialog({ open, onOpenChange, settings }: SettingsDialogP
       setPassword("")
       setSmtpHost("")
       setSmtpPort("")
+      setStoredSmtp(null)
       setEmailDomain(null)
       setSmtpConfig(null)
       setTestPassed(false)
