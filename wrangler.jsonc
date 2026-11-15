@@ -10,7 +10,6 @@
 		"binding": "ASSETS",
 		"directory": ".svelte-kit/cloudflare"
 	},
-	"keep_names": false,
 	"observability": {
 		"enabled": true
 	},
