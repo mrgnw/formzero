@@ -1,7 +1,7 @@
 export type Settings = {
   id: string
   notification_email: string | null
-  notification_email_password: string | null
+  has_password: boolean
   smtp_host: string | null
   smtp_port: number | null
   smtp_secure: number

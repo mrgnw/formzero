@@ -19,9 +19,17 @@ export async function action({ context, request }: Route.ActionArgs) {
     // Parse form data
     const formData = await request.formData()
     const notification_email = formData.get("notification_email") as string
-    const notification_email_password = formData.get("notification_email_password") as string
+    const submittedPassword = formData.get("notification_email_password") as string
     const smtp_host = formData.get("smtp_host") as string
     const smtp_port = formData.get("smtp_port") as string
+
+    const notification_email_password =
+      submittedPassword ||
+      (
+        await database
+          .prepare("SELECT notification_email_password FROM settings WHERE id = 'global'")
+          .first<{ notification_email_password: string | null }>()
+      )?.notification_email_password
 
     // Validate required fields
     if (!notification_email || !notification_email_password || !smtp_host || !smtp_port) {

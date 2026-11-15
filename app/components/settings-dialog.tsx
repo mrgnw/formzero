@@ -66,7 +66,7 @@ export function SettingsDialog({ open, onOpenChange, settings }: SettingsDialogP
 
   // Initialize with user's email if settings don't exist yet
   const [email, setEmail] = useState(settings?.notification_email || "")
-  const [password, setPassword] = useState(settings?.notification_email_password || "")
+  const [password, setPassword] = useState("")
   const [smtpHost, setSmtpHost] = useState(settings?.smtp_host || "")
   const [smtpPort, setSmtpPort] = useState(settings?.smtp_port?.toString() || "")
 
@@ -84,7 +84,7 @@ export function SettingsDialog({ open, onOpenChange, settings }: SettingsDialogP
   useEffect(() => {
     if (settings) {
       setEmail(settings.notification_email || "")
-      setPassword(settings.notification_email_password || "")
+      setPassword("")
       setSmtpHost(settings.smtp_host || "")
       setSmtpPort(settings.smtp_port?.toString() || "")
     }
@@ -128,6 +128,7 @@ export function SettingsDialog({ open, onOpenChange, settings }: SettingsDialogP
 
   const isClearing = clearFetcher.state === "submitting"
   const isCleared = clearFetcher.state === "idle" && clearFetcher.data?.success
+  const hasStoredPassword = Boolean(settings?.has_password) && !isCleared
 
   useEffect(() => {
     if (testSuccess) {
@@ -222,10 +223,10 @@ export function SettingsDialog({ open, onOpenChange, settings }: SettingsDialogP
                         id="password"
                         name="notification_email_password"
                         type="password"
-                        placeholder="Enter your SMTP password"
+                        placeholder={hasStoredPassword ? "Leave blank to keep the saved password" : "Enter your SMTP password"}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        required
+                        required={!hasStoredPassword}
                       />
                       <p className="text-sm text-muted-foreground">
                         {smtpConfig ? smtpConfig.hint : "Use your email password or app-specific password"}
@@ -294,7 +295,7 @@ export function SettingsDialog({ open, onOpenChange, settings }: SettingsDialogP
                               isSuccess={testSuccess}
                               loadingText="Sending..."
                               successText="Test email sent!"
-                              disabled={!email || !password || !smtpHost || !smtpPort}
+                              disabled={!email || (!password && !hasStoredPassword) || !smtpHost || !smtpPort}
                               onClick={handleTestEmail}
                               className="w-full sm:w-auto"
                             >
