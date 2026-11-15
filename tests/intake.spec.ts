@@ -232,6 +232,11 @@ test.describe("redirect targets", () => {
 		"ftp://customer.example/file",
 		"thanks.html",
 		" https://customer.example",
+		"https:evil.example",
+		"http:/evil.example",
+		"https:\\evil.example",
+		"https:///evil.example",
+		"https://",
 	];
 
 	for (const target of allowed) {

@@ -27,7 +27,7 @@ function redirect(location: string, status: 302 | 303) {
 function isSafeRedirect(target: string) {
 	if (/[\s\\\x00-\x1f\x7f]/.test(target)) return false;
 	if (target.startsWith('/') && !target.startsWith('//')) return true;
-	return URL.canParse(target) && ['http:', 'https:'].includes(new URL(target).protocol);
+	return /^https?:\/\/[^/?#]/i.test(target) && URL.canParse(target);
 }
 
 function redirectTarget(request: Request) {
