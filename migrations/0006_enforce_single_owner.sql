@@ -1,6 +1,6 @@
 -- Migration number: 0006
 
-CREATE TRIGGER user_single_owner
+CREATE TRIGGER IF NOT EXISTS user_single_owner
 BEFORE INSERT ON "user"
 WHEN EXISTS (SELECT 1 FROM "user")
 BEGIN
