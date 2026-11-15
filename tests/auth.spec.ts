@@ -61,6 +61,18 @@ test.describe("signed out", () => {
 		await expect(page).toHaveURL(/\/login$/);
 	});
 
+	test.describe("without JavaScript", () => {
+		test.use({ javaScriptEnabled: false });
+
+		test("login signs in through a plain form post", async ({ page }) => {
+			await page.goto("/login");
+			await page.getByLabel("Email").fill(credentials.email);
+			await page.getByLabel("Password").fill(credentials.password);
+			await page.getByRole("button", { name: "Sign In" }).click();
+			await expect(page).toHaveURL(/\/forms\/[^/]+\/submissions$/);
+		});
+	});
+
 	test("sign-out sets every clearing cookie through the catch-all", async ({ request }) => {
 		const signIn = await request.post("/api/auth/sign-in/email", {
 			data: { email: credentials.email, password: credentials.password },

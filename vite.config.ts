@@ -9,7 +9,8 @@ export default defineConfig({
 		tailwindcss(),
 		sveltekit({
 			adapter: adapter(),
-			csrf: { trustedOrigins: ['*'] }
+			csrf: { trustedOrigins: ['*'] },
+			experimental: { remoteFunctions: true }
 		})
 	],
 	resolve: {
