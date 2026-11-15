@@ -138,13 +138,11 @@
 							id="smtp-port"
 							{...smtp_port.as('number', saved?.smtp_port)}
 							placeholder="587"
-							min="1"
-							max="65535"
 							aria-describedby="smtp-port-help smtp-port-issues"
 							required
 						/>
 						<p id="smtp-port-help" class="text-sm text-muted-foreground">
-							Common ports: 587 (TLS), 465 (SSL), 25 (Plain)
+							Allowed ports: 587, 2525 or 25 (STARTTLS) and 465 (TLS)
 						</p>
 						<FieldIssues id="smtp-port-issues" issues={smtp_port.issues()} />
 					</div>

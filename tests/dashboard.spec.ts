@@ -222,7 +222,7 @@ test.describe("notification settings", () => {
 		await dialog.getByLabel("Your Email").fill("owner@unreachable.invalid");
 		await dialog.getByLabel("SMTP Password").fill("irrelevant");
 		await dialog.getByLabel("SMTP Host").fill("127.0.0.1");
-		await dialog.getByLabel("SMTP Port").fill("1");
+		await dialog.getByLabel("SMTP Port").fill("2525");
 
 		const save = dialog.getByRole("button", { name: "Save Settings" });
 		await expect(save).toBeDisabled();
@@ -245,7 +245,7 @@ test.describe("notification settings", () => {
 		await dialog.getByLabel("Your Email").fill("owner@unreachable.invalid");
 		await dialog.getByLabel("SMTP Password").fill(typedPassword);
 		await dialog.getByLabel("SMTP Host").fill("127.0.0.1");
-		await dialog.getByLabel("SMTP Port").fill("1");
+		await dialog.getByLabel("SMTP Port").fill("2525");
 		await dialog.getByRole("button", { name: "Send test email" }).click();
 
 		await expect(dialog.getByText(connectError)).toBeVisible();
@@ -253,11 +253,11 @@ test.describe("notification settings", () => {
 		expect(failed).toBeDefined();
 		expect(failed).not.toContain(typedPassword);
 		expect(failed).not.toContain("ECONNREFUSED");
-		expect(failed).not.toContain("127.0.0.1:1");
+		expect(failed).not.toContain("127.0.0.1:2525");
 	});
 
 	test("the stored password never reaches the browser", async ({ page }) => {
-		seedSettings("127.0.0.1", 1);
+		seedSettings("127.0.0.1", 2525);
 		const bodies: string[] = [];
 		page.on("response", async (response) => {
 			bodies.push(await response.text().catch(() => ""));
@@ -275,9 +275,9 @@ test.describe("notification settings", () => {
 	});
 
 	test("a blank password is refused when the host or port changes", async ({ page }) => {
-		seedSettings("127.0.0.1", 1);
+		seedSettings("127.0.0.1", 2525);
 		const dialog = await openSettings(page);
-		await dialog.getByLabel("SMTP Port").fill("2");
+		await dialog.getByLabel("SMTP Port").fill("25");
 
 		const sendTest = dialog.getByRole("button", { name: "Send test email" });
 		await expect(sendTest).toBeDisabled();
@@ -291,7 +291,7 @@ test.describe("notification settings", () => {
 	});
 
 	test("settings remote calls are refused cross-origin and when signed out", async ({ page }) => {
-		seedSettings("127.0.0.1", 1);
+		seedSettings("127.0.0.1", 2525);
 		const queryUrl = page.waitForRequest((request) => request.url().includes("/_app/remote/"));
 		const dialog = await openSettings(page);
 		const remoteQuery = (await queryUrl).url();
@@ -329,6 +329,39 @@ test.describe("notification settings", () => {
 		await stranger.dispose();
 
 		expect(d1("SELECT notification_email FROM settings")).toEqual([{ notification_email: "seeded@example.org" }]);
+	});
+
+	test("ports outside the SMTP allowlist are refused in the browser and on the server", async ({ page }) => {
+		const dialog = await openSettings(page);
+		await dialog.getByLabel("Your Email").fill("owner@unreachable.invalid");
+		await dialog.getByLabel("SMTP Password").fill("irrelevant");
+		await dialog.getByLabel("SMTP Host").fill("127.0.0.1");
+		await dialog.getByLabel("SMTP Port").fill("22");
+		await dialog.getByRole("button", { name: "Send test email" }).click();
+		await expect(dialog.getByText("Use SMTP port 25, 465, 587 or 2525")).toBeVisible();
+		await expect(dialog.getByText(connectError)).toHaveCount(0);
+
+		d1("DELETE FROM settings");
+		const form = dialog.locator("form").first();
+		const action = await form.getAttribute("action");
+		const values: Record<string, string> = { intent: "save", notification_email: "owner@example.org", _password: "x", smtp_host: "127.0.0.1", "n:smtp_port": "22" };
+		const names = await form.locator("[name]").evaluateAll((elements) => elements.map((element) => element.getAttribute("name") ?? ""));
+		const fields = Object.fromEntries(
+			names.flatMap((name) => {
+				const value = values[name.split("/")[0]];
+				return value === undefined ? [] : [[name, value]];
+			}),
+		);
+		expect(Object.keys(fields)).toHaveLength(5);
+		const owner = await authedRequest();
+		const response = await owner.post(`/forms/${firstForm.id}/integration${action}`, {
+			form: fields,
+			headers: { Accept: "text/html" },
+			maxRedirects: 0,
+		});
+		expect(response.status()).toBeLessThan(500);
+		await owner.dispose();
+		expect(d1("SELECT id FROM settings")).toHaveLength(0);
 	});
 
 	test("disable notifications clears a seeded row", async ({ page }) => {
