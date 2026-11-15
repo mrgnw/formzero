@@ -1,6 +1,6 @@
 import type { Route } from "./+types/settings.notifications.test"
 import { data } from "react-router"
-import { sendTestEmail } from "~/lib/email.server"
+import { sendTestEmail } from "../../src/lib/server/email"
 import { requireAuth } from "~/lib/require-auth.server"
 
 export async function action({ context, request }: Route.ActionArgs) {
