@@ -156,3 +156,39 @@ test.describe("limits", () => {
 		expect(response.status()).toBe(201);
 	});
 });
+
+test.describe("redirect targets", () => {
+	const allowed = ["https://customer.example/thanks?x=1", "http://customer.example", "/thanks", "/success?from=form"];
+	const rejected = [
+		"javascript:alert(1)",
+		"JavaScript:alert(1)",
+		"data:text/html,<script>alert(1)</script>",
+		"//evil.example/phish",
+		"/\\evil.example",
+		"ftp://customer.example/file",
+		"thanks.html",
+		" https://customer.example",
+	];
+
+	for (const target of allowed) {
+		test(`?redirect=${target} is followed`, async ({ request }) => {
+			const response = await post(request, { form: { name: "Ada" } }, `${submissionPath(formId)}?redirect=${encodeURIComponent(target)}`);
+			expect(response.status()).toBe(303);
+			expect(response.headers()["location"]).toBe(target);
+		});
+	}
+
+	for (const target of rejected) {
+		test(`?redirect=${target} falls back to /success`, async ({ request }) => {
+			const response = await post(request, { form: { name: "Ada" } }, `${submissionPath(formId)}?redirect=${encodeURIComponent(target)}`);
+			expect(response.status()).toBe(303);
+			expect(response.headers()["location"]).toBe("/success");
+		});
+	}
+
+	test("a javascript: Referer falls back to /success", async ({ request }) => {
+		const response = await post(request, { form: { name: "Ada" }, headers: { Referer: "javascript:alert(1)" } });
+		expect(response.status()).toBe(303);
+		expect(response.headers()["location"]).toBe("/success");
+	});
+});

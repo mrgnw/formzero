@@ -24,8 +24,15 @@ function redirect(location: string, status: 302 | 303) {
 	return new Response(null, { status, headers: { Location: location } });
 }
 
+function isSafeRedirect(target: string) {
+	if (/[\s\\\x00-\x1f\x7f]/.test(target)) return false;
+	if (target.startsWith('/') && !target.startsWith('//')) return true;
+	return URL.canParse(target) && ['http:', 'https:'].includes(new URL(target).protocol);
+}
+
 function redirectTarget(request: Request) {
-	return new URL(request.url).searchParams.get('redirect') || request.headers.get('referer') || '/success';
+	const target = new URL(request.url).searchParams.get('redirect') || request.headers.get('referer');
+	return target && isSafeRedirect(target) ? target : '/success';
 }
 
 class Rejection extends Error {
