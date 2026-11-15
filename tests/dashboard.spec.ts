@@ -252,6 +252,19 @@ test("rename a form", async ({ page }) => {
 	await expect(page).toHaveURL(`/forms/${firstForm.id}/settings`);
 });
 
+test("renaming to a name with no letters or numbers is rejected", async ({ page }) => {
+	await page.goto(`/forms/${firstForm.id}/settings`);
+	const name = page.getByLabel("Name", { exact: true });
+	const before = await name.inputValue();
+
+	await name.fill("!!!");
+	await page.getByRole("button", { name: "Save", exact: true }).click();
+	await expect(page.getByText("Form name must contain a letter or number")).toBeVisible();
+
+	await page.reload();
+	await expect(name).toHaveValue(before);
+});
+
 test("delete a form with type-to-confirm", async ({ page }) => {
 	await page.goto(`/forms/${secondForm.id}/settings`);
 	await page.getByRole("button", { name: "Delete Form" }).click();
