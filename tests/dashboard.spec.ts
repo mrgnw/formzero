@@ -15,10 +15,9 @@ const submissions = [
 const timeNewestFirst = ["bravo@example.com", "alpha@example.com", "charlie@example.com"];
 
 async function expectRowOrder(page: Page, emails: string[]) {
-	const rows = page.getByRole("row");
-	for (const [index, email] of emails.entries()) {
-		await expect(rows.nth(index + 1)).toContainText(email);
-	}
+	const dataRows = page.getByRole("row").filter({ hasText: "@example.com" });
+	await expect(dataRows).toHaveCount(emails.length);
+	await expect(dataRows).toContainText(emails);
 }
 
 test("create the first form from /setup", async ({ page }) => {
