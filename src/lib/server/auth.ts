@@ -6,6 +6,8 @@ import { redirect } from '@sveltejs/kit';
 import { env } from 'cloudflare:workers';
 import { D1Dialect } from 'kysely-d1';
 
+if (!env.BETTER_AUTH_SECRET) throw new Error('BETTER_AUTH_SECRET is not set');
+
 async function userCount() {
 	const row = await env.DB.prepare('SELECT COUNT(*) AS count FROM user').first<{ count: number }>();
 	return row?.count ?? 0;
