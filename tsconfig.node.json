@@ -1,6 +1,6 @@
 {
-  "extends": "./tsconfig.json",
-  "include": ["vite.config.ts", "better-auth.config.ts", "playwright.config.ts", "tests/**/*.ts"],
+  "extends": "./tsconfig.react.json",
+  "include": ["vite.config.ts", "vite.react.config.ts", "react-router.config.ts", "better-auth.config.ts", "playwright.config.ts", "tests/**/*.ts"],
   "compilerOptions": {
     "composite": true,
     "strict": true,

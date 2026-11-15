@@ -1,14 +1,17 @@
-import { reactRouter } from "@react-router/dev/vite";
-import { cloudflare } from "@cloudflare/vite-plugin";
-import tailwindcss from "@tailwindcss/vite";
-import { defineConfig } from "vite";
-import tsconfigPaths from "vite-tsconfig-paths";
+import { sveltekit } from '@sveltejs/kit/vite';
+import adapter from '@sveltejs/adapter-cloudflare';
+import { fileURLToPath } from 'node:url';
+import { defineConfig } from 'vite';
 
 export default defineConfig({
-  plugins: [
-    cloudflare({ viteEnvironment: { name: "ssr" } }),
-    tailwindcss(),
-    reactRouter(),
-    tsconfigPaths(),
-  ],
+	plugins: [
+		sveltekit({
+			adapter: adapter(),
+			csrf: { trustedOrigins: ['*'] }
+		})
+	],
+	resolve: {
+		alias: { 'virtual:react-build': fileURLToPath(new URL('./build/react/server/index.js', import.meta.url)) }
+	},
+	server: { port: 5473, strictPort: true }
 });
