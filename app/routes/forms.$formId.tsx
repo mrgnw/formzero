@@ -25,7 +25,7 @@ export const meta: Route.MetaFunction = () => {
 export async function loader({ context, params, request }: Route.LoaderArgs) {
   const database = context.cloudflare.env.DB
 
-  await requireAuth(request, database)
+  await requireAuth(request, context.cloudflare.env)
 
   // Fetch form details
   const result = await database
