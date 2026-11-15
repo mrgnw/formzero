@@ -4,11 +4,3 @@ export type Submission = {
   data: Record<string, any>
   created_at: number
 }
-
-export type SubmissionEmailData = {
-  id: string
-  formId: string
-  formName: string
-  data: Record<string, any>
-  createdAt: number
-}

@@ -1,5 +1,5 @@
 import { env, waitUntil } from 'cloudflare:workers';
-import type { EmailConfig } from '../../../app/types/settings';
+import type { EmailConfig } from '#lib/types.js';
 import { sendSubmissionNotification } from './email';
 
 export const corsHeaders = {
