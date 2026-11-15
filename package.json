@@ -3,7 +3,7 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"build": "react-router build --config vite.react.config.ts && vite build && cp -R build/react/client/. .svelte-kit/cloudflare/",
+		"build": "rm -rf .wrangler/deploy build && react-router build --config vite.react.config.ts && vite build && cp -R build/react/client/. .svelte-kit/cloudflare/",
 		"migrate": "yes Y | wrangler d1 migrations apply DB",
 		"seed": "yes Y | wrangler d1 execute DB --file seed.sql",
 		"cf-typegen": "wrangler types --include-main-module=false",
