@@ -1,7 +1,7 @@
 import { form, getRequestEvent } from '$app/server';
 import { invalid, redirect } from '@sveltejs/kit';
 import { APIError } from 'better-auth/api';
-import { getAuth, requireUser } from '#lib/server/auth.js';
+import { getAuth, limitAuthAttempt, requireUser, TOO_MANY_ATTEMPTS } from '#lib/server/auth.js';
 import { signInSchema, signUpSchema } from '#lib/schemas.js';
 
 function authFailure(error: unknown, fallback: string, unexpected: string): never {
@@ -12,6 +12,7 @@ function authFailure(error: unknown, fallback: string, unexpected: string): neve
 
 export const signIn = form(signInSchema, async ({ email, _password }) => {
 	const { request } = getRequestEvent();
+	if (!(await limitAuthAttempt(request, email)).allowed) invalid(TOO_MANY_ATTEMPTS);
 	try {
 		await getAuth().api.signInEmail({ body: { email, password: _password }, headers: request.headers });
 	} catch (error) {
@@ -22,6 +23,7 @@ export const signIn = form(signInSchema, async ({ email, _password }) => {
 
 export const signUp = form(signUpSchema, async ({ name, email, _password }) => {
 	const { request } = getRequestEvent();
+	if (!(await limitAuthAttempt(request, email)).allowed) invalid(TOO_MANY_ATTEMPTS);
 	try {
 		await getAuth().api.signUpEmail({ body: { name, email, password: _password }, headers: request.headers });
 	} catch (error) {

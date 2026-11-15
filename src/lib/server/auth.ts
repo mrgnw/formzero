@@ -5,6 +5,12 @@ import { getRequestEvent } from '$app/server';
 import { redirect } from '@sveltejs/kit';
 import { env } from 'cloudflare:workers';
 import { D1Dialect } from 'kysely-d1';
+import { clientIp, hit } from './rate-limit';
+
+export const AUTH_ATTEMPTS_PER_IP = 20;
+export const AUTH_ATTEMPTS_PER_EMAIL = 10;
+export const AUTH_WINDOW_SECONDS = 600;
+export const TOO_MANY_ATTEMPTS = 'Too many attempts. Please try again later.';
 
 export async function userCount() {
 	const row = await env.DB.prepare('SELECT COUNT(*) AS count FROM user').first<{ count: number }>();
@@ -45,4 +51,13 @@ export function requireUser() {
 	const { locals } = getRequestEvent();
 	if (!locals.user) redirect(302, '/login');
 	return locals.user;
+}
+
+export async function limitAuthAttempt(request: Request, email: string | null) {
+	const limits = await Promise.all([
+		hit(`auth:ip:${clientIp(request)}`, AUTH_ATTEMPTS_PER_IP, AUTH_WINDOW_SECONDS),
+		...(email ? [hit(`auth:email:${email.trim().toLowerCase()}`, AUTH_ATTEMPTS_PER_EMAIL, AUTH_WINDOW_SECONDS)] : [])
+	]);
+	const blocked = limits.filter((limit) => !limit.allowed);
+	return { allowed: blocked.length === 0, retryAfter: Math.max(0, ...blocked.map((limit) => limit.retryAfter)) };
 }
