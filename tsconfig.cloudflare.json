@@ -1,5 +1,5 @@
 {
-  "extends": "./tsconfig.json",
+  "extends": "./tsconfig.react.json",
   "include": [
     ".react-router/types/**/*",
     "app/**/*",
@@ -9,7 +9,6 @@
     "app/types/**/*",
     "app/**/.server/**/*",
     "app/**/.client/**/*",
-    "workers/**/*",
     "worker-configuration.d.ts"
   ],
   "compilerOptions": {
