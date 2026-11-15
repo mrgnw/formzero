@@ -2,6 +2,8 @@ import { cellText, OBJECT_DATA, type Row, toSubmission } from './submission-data
 
 export const CSV_BATCH_SIZE = 1000;
 export const CSV_MAX_ROWS = 100_000;
+export const CSV_MAX_COLUMNS = 500;
+export const CSV_MAX_CELL_LENGTH = 32 * 1024;
 
 function escapeCsv(text: string) {
 	if (/[",\r\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
@@ -9,7 +11,7 @@ function escapeCsv(text: string) {
 }
 
 function userCell(value: unknown) {
-	const text = cellText(value);
+	const text = cellText(value).slice(0, CSV_MAX_CELL_LENGTH);
 	return escapeCsv(/^[=+\-@\t\r]/.test(text) ? `'${text}` : text);
 }
 
@@ -30,9 +32,10 @@ async function csvKeys(db: D1Database, formId: string, snapshot: Cursor) {
 		.prepare(
 			`SELECT DISTINCT key FROM (
 				SELECT data FROM submissions WHERE form_id = ? AND ${UP_TO} ORDER BY created_at DESC, id DESC LIMIT ?
-			), json_each(${OBJECT_DATA})`
+			), json_each(${OBJECT_DATA})
+			ORDER BY key LIMIT ?`
 		)
-		.bind(formId, snapshot.created_at, snapshot.created_at, snapshot.id, CSV_MAX_ROWS)
+		.bind(formId, snapshot.created_at, snapshot.created_at, snapshot.id, CSV_MAX_ROWS, CSV_MAX_COLUMNS)
 		.all<{ key: string }>();
 	return results.map((row) => row.key).sort();
 }
