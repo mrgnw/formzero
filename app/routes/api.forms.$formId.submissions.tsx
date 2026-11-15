@@ -1,6 +1,6 @@
 import type { Route } from "./+types/api.forms.$formId.submissions";
 import { data, redirect } from "react-router";
-import { sendSubmissionNotification } from "~/lib/email.server";
+import { sendSubmissionNotification } from "../../src/lib/server/email";
 import type { EmailConfig } from "#/types/settings";
 
 // CORS headers to allow submissions from any domain

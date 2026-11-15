@@ -1,6 +1,6 @@
 import nodemailer from "nodemailer"
-import type { EmailConfig } from "#/types/settings"
-import type { SubmissionEmailData } from "#/types/submission"
+import type { EmailConfig } from "../../../app/types/settings"
+import type { SubmissionEmailData } from "../../../app/types/submission"
 
 /**
  * Sends a test email to verify SMTP settings
