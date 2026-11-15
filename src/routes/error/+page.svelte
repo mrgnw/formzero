@@ -12,6 +12,10 @@
 			title: 'Something Went Wrong',
 			description: 'We encountered an error while processing your submission. Please try again later.'
 		},
+		invalid_submission: {
+			title: 'Submission Rejected',
+			description: 'Your submission was too large or contained unsupported data, such as file uploads.'
+		},
 		unsupported_content_type: {
 			title: 'Unsupported Format',
 			description: 'The format of your submission is not supported. Please check your form configuration.'
