@@ -25,14 +25,24 @@ for (const [label, value] of [
 	});
 }
 
-test("POST /forms without an Origin header is allowed", async () => {
+test("POST /forms without an Origin header is rejected", async () => {
 	const response = await postForm({});
-	expect(response.status()).toBe(302);
+	expect(response.status()).toBe(403);
 });
 
 test("POST /forms with a matching Origin is allowed", async () => {
 	const response = await postForm({ Origin: origin });
 	expect(response.status()).toBe(302);
+});
+
+test("a no-JS remote form post without an Origin header is rejected", async () => {
+	const response = await owner.post("/setup?/remote=anything", { form: { name: "CSRF Probe" }, maxRedirects: 0 });
+	expect(response.status()).toBe(403);
+});
+
+test("a POST to the public API without an Origin header is accepted", async () => {
+	const response = await owner.post(submissionPath(firstForm.id), { form: { name: "Grace" }, maxRedirects: 0 });
+	expect(response.status()).toBe(303);
 });
 
 test("a cross-origin POST to the public API is accepted", async () => {
