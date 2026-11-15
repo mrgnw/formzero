@@ -87,20 +87,20 @@ test.describe("multipart files", () => {
 });
 
 test.describe("limits", () => {
-	const tooLarge = { success: false, error: "Submission is larger than 65536 bytes" };
+	const tooLarge = { success: false, error: "Submission is larger than 262144 bytes" };
 
-	test("a body over 64 KiB is a 413", async ({ request }) => {
-		const response = await postJson(request, JSON.stringify({ message: "x".repeat(70_000) }));
+	test("a body over 256 KiB is a 413", async ({ request }) => {
+		const response = await postJson(request, JSON.stringify({ message: "x".repeat(270_000) }));
 		await expectRejected(response, 413, tooLarge.error);
 	});
 
-	test("a chunked body over 64 KiB without Content-Length is a 413", async ({ baseURL }) => {
+	test("a chunked body over 256 KiB without Content-Length is a 413", async ({ baseURL }) => {
 		const chunk = new TextEncoder().encode(`"${"x".repeat(16_000)}",`);
 		let sent = 0;
 		const body = new ReadableStream<Uint8Array>({
 			pull(controller) {
 				if (sent === 0) controller.enqueue(new TextEncoder().encode('{"a":['));
-				if (sent++ < 8) controller.enqueue(chunk);
+				if (sent++ < 20) controller.enqueue(chunk);
 				else controller.close();
 			},
 		});
@@ -115,7 +115,7 @@ test.describe("limits", () => {
 	});
 
 	test("an oversized form post sends a browser to the error page", async ({ request }) => {
-		const response = await post(request, { form: { message: "x".repeat(70_000) } });
+		const response = await post(request, { form: { message: "x".repeat(270_000) } });
 		expect(response.status()).toBe(302);
 		expect(response.headers()["location"]).toBe("/error?error=invalid_submission");
 	});
@@ -130,12 +130,12 @@ test.describe("limits", () => {
 		await expectRejected(response, 400, "Field names must be at most 100 characters");
 	});
 
-	test("a value over 10,000 characters is a 400", async ({ request }) => {
+	test("a value over 32,000 characters is a 400", async ({ request }) => {
 		const response = await post(request, {
-			form: { message: "x".repeat(10_001) },
+			form: { message: "x".repeat(32_001) },
 			headers: { Accept: "application/json" },
 		});
-		await expectRejected(response, 400, "Field values must be at most 10000 characters");
+		await expectRejected(response, 400, "Field values must be at most 32000 characters");
 	});
 
 	for (const value of [{ nested: true }, [["deep"]], [{ a: 1 }]]) {
@@ -149,11 +149,57 @@ test.describe("limits", () => {
 		const fields: Record<string, unknown> = Object.fromEntries(
 			Array.from({ length: 97 }, (_, i) => [`f${i}`, i]),
 		);
-		fields["n".repeat(100)] = "x".repeat(10_000);
+		fields["n".repeat(100)] = "x".repeat(32_000);
 		fields.tags = ["a", 1, true, null];
 		fields.empty = null;
 		const response = await postJson(request, JSON.stringify(fields));
 		expect(response.status()).toBe(201);
+	});
+});
+
+test.describe("limit boundaries", () => {
+	const maxBytes = 256 * 1024;
+	const tooLargeError = "Submission is larger than 262144 bytes";
+	const valueTooLongError = "Field values must be at most 32000 characters";
+	const values = {
+		CJK: (length: number) => "文".repeat(length),
+		emoji: (length: number) => "😀".repeat(Math.floor(length / 2)) + "a".repeat(length % 2),
+		"newline-heavy": (length: number) => "a\n".repeat(Math.floor(length / 2)) + "a".repeat(length % 2),
+	};
+	const encodings = {
+		json: (message: string) => ({ data: { message } }),
+		urlencoded: (message: string) => ({ form: { message }, headers: { Accept: "application/json" } }),
+		multipart: (message: string) => ({ multipart: { message }, headers: { Accept: "application/json" } }),
+	};
+
+	for (const [kind, value] of Object.entries(values)) {
+		for (const [encoding, body] of Object.entries(encodings)) {
+			if (kind === "CJK" && encoding === "urlencoded") continue;
+			test(`${kind} ${encoding}: 32,000 code units are stored, 32,001 are a 400`, async ({ request }) => {
+				expect(value(32_000).length).toBe(32_000);
+				expect((await post(request, body(value(32_000)))).status()).toBe(201);
+				await expectRejected(await post(request, body(value(32_001))), 400, valueTooLongError);
+			});
+		}
+	}
+
+	test("urlencoded CJK fits until the encoded body passes 256 KiB", async ({ request }) => {
+		const fits = Math.floor((maxBytes - "message=".length) / encodeURIComponent("文").length);
+		const send = (length: number) => post(request, encodings.urlencoded("文".repeat(length)));
+		expect((await send(fits)).status()).toBe(201);
+		await expectRejected(await send(fits + 1), 413, tooLargeError);
+	});
+
+	test("a JSON body of exactly 256 KiB is stored, one byte more is a 413", async ({ request }) => {
+		const bodyOfSize = (size: number) => {
+			const fields: Record<string, string> = { p: "" };
+			for (let i = 0; i < 9; i++) fields[`f${i}`] = "x".repeat(29_000);
+			fields.p = "x".repeat(size - JSON.stringify(fields).length);
+			return JSON.stringify(fields);
+		};
+		expect(bodyOfSize(maxBytes).length).toBe(maxBytes);
+		expect((await postJson(request, bodyOfSize(maxBytes))).status()).toBe(201);
+		await expectRejected(await postJson(request, bodyOfSize(maxBytes + 1)), 413, tooLargeError);
 	});
 });
 

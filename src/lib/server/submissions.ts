@@ -9,10 +9,10 @@ export const corsHeaders = {
 	'Access-Control-Max-Age': '86400'
 };
 
-const MAX_BODY_BYTES = 64 * 1024;
+const MAX_BODY_BYTES = 256 * 1024;
 const MAX_FIELDS = 100;
 const MAX_NAME_LENGTH = 100;
-const MAX_VALUE_LENGTH = 10_000;
+const MAX_VALUE_LENGTH = 32_000;
 
 type Submission = { id: string; formId: string; data: Record<string, unknown>; createdAt: number };
 
