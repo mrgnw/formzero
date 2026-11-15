@@ -48,6 +48,56 @@ test.describe("signed out", () => {
 		expect(body.message).toBe("An account already exists. Please login instead.");
 	});
 
+	test("direct sign-in is limited per account email with a generic 429", async ({ request }) => {
+		const email = `limited-${Date.now()}@example.com`;
+		for (let attempt = 1; attempt <= 10; attempt++) {
+			const response = await request.post("/api/auth/sign-in/email", {
+				headers: { ...originHeaders, "CF-Connecting-IP": `192.0.2.${attempt}` },
+				data: { email, password: "not-the-password" },
+			});
+			expect(response.status(), `attempt ${attempt}`).toBe(401);
+		}
+		const limited = await request.post("/api/auth/sign-in/email", {
+			headers: { ...originHeaders, "CF-Connecting-IP": "192.0.2.11" },
+			data: { email, password: "not-the-password" },
+		});
+		expect(limited.status()).toBe(429);
+		expect(Number(limited.headers()["retry-after"])).toBeGreaterThan(0);
+		expect(await limited.json()).toEqual({ code: "TOO_MANY_REQUESTS", message: "Too many attempts. Please try again later." });
+	});
+
+	test("direct sign-in is limited per client IP", async ({ request }) => {
+		const headers = { ...originHeaders, "CF-Connecting-IP": "198.51.100.77" };
+		for (let attempt = 1; attempt <= 20; attempt++) {
+			const response = await request.post("/api/auth/sign-in/email", {
+				headers,
+				data: { email: `ip-${attempt}-${Date.now()}@example.com`, password: "not-the-password" },
+			});
+			expect(response.status(), `attempt ${attempt}`).toBe(401);
+		}
+		const limited = await request.post("/api/auth/sign-in/email", {
+			headers,
+			data: { email: credentials.email, password: credentials.password },
+		});
+		expect(limited.status()).toBe(429);
+	});
+
+	test("remote login past the limit shows a generic error", async ({ browser }) => {
+		const ip = "203.0.113.9";
+		const email = `remote-limited-${Date.now()}@example.com`;
+		const context = await browser.newContext({ javaScriptEnabled: false, extraHTTPHeaders: { "CF-Connecting-IP": ip } });
+		const page = await context.newPage();
+		for (let attempt = 1; attempt <= 11; attempt++) {
+			await page.goto("/login");
+			await page.getByLabel("Email").fill(email);
+			await page.getByLabel("Password").fill("not-the-password");
+			await page.getByRole("button", { name: "Sign In" }).click();
+			const expected = attempt <= 10 ? "Invalid email or password" : "Too many attempts. Please try again later.";
+			await expect(page.getByText(expected), `attempt ${attempt}`).toBeVisible();
+		}
+		await context.close();
+	});
+
 	test("wrong password shows an error and stays on /login", async ({ page }) => {
 		await page.goto("/login");
 		await page.getByLabel("Email").fill(credentials.email);
