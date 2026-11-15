@@ -22,16 +22,19 @@ export function FormNav() {
       title: "Submissions",
       url: `/forms/${formId}/submissions`,
       icon: Database,
+      reloadDocument: false,
     },
     {
       title: "Integration",
       url: `/forms/${formId}/integration`,
       icon: Puzzle,
+      reloadDocument: true,
     },
     {
       title: "Settings",
       url: `/forms/${formId}/settings`,
       icon: Settings,
+      reloadDocument: false,
     },
   ]
 
@@ -42,7 +45,7 @@ export function FormNav() {
           {items.map((item) => (
             <SidebarMenuItem key={item.title}>
               <SidebarMenuButton asChild>
-                <NavLink to={item.url}>
+                <NavLink to={item.url} reloadDocument={item.reloadDocument}>
                   <item.icon />
                   <span>{item.title}</span>
                 </NavLink>
