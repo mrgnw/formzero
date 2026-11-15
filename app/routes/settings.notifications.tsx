@@ -1,4 +1,5 @@
 import { requireAuth } from "~/lib/require-auth.server"
+import { requireSameOrigin } from "~/lib/require-same-origin.server"
 import type { Route } from "./+types/settings.notifications"
 import { data } from "react-router"
 
@@ -28,6 +29,8 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 
 export async function action({ request, context }: Route.ActionArgs) {
   const database = context.cloudflare.env.DB
+
+  requireSameOrigin(request)
 
   await requireAuth(request, database)
 

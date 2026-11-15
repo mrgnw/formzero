@@ -2,9 +2,12 @@ import type { Route } from "./+types/settings.notifications.test"
 import { data } from "react-router"
 import { sendTestEmail } from "~/lib/email.server"
 import { requireAuth } from "~/lib/require-auth.server"
+import { requireSameOrigin } from "~/lib/require-same-origin.server"
 
 export async function action({ context, request }: Route.ActionArgs) {
   const database = context.cloudflare.env.DB
+
+  requireSameOrigin(request)
 
   await requireAuth(request, database)
 
