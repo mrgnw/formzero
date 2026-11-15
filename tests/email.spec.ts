@@ -1,6 +1,6 @@
 import { createServer, type Server } from "node:net";
 import { expect, test } from "@playwright/test";
-import { sendTestEmail, smtpTransportOptions, submissionNotification } from "../src/lib/server/email";
+import { sendSubmissionNotification, sendTestEmail, smtpTransportOptions, submissionNotification } from "../src/lib/server/email";
 
 const account = { notification_email: "owner@example.com", notification_email_password: "smtp-secret", smtp_host: "127.0.0.1" };
 
@@ -52,4 +52,23 @@ test("markup and control characters in a form name are neutralised in notificati
 	expect(message.subject).toBe('New Submission for "<img src=x onerror="alert(1)"><b>Evil</b>  Bcc: victim@example.com "');
 	expect(message.text).not.toMatch(/[\r\u0007]/);
 	expect(message.text).toContain("Form: <img src=x onerror=\"alert(1)\"><b>Evil</b>  Bcc: victim@example.com \n");
+});
+
+test("SMTP failures are logged as classified fields, not raw server responses", async () => {
+	const server = plaintextSmtpServer([]);
+	const logged: unknown[][] = [];
+	const original = console.error;
+	console.error = (...args: unknown[]) => logged.push(args);
+	try {
+		const config = { ...account, smtp_port: await listen(server) };
+		await sendTestEmail(config);
+		await sendSubmissionNotification(config, { id: "sub-1", formId: "f", formName: "F", data: {}, createdAt: 0 });
+	} finally {
+		console.error = original;
+		server.close();
+	}
+	expect(logged).toEqual([
+		["Error sending test email:", { code: "ETLS", command: "STARTTLS", responseCode: 502 }],
+		["Error sending notification email:", { code: "ETLS", command: "STARTTLS", responseCode: 502 }],
+	]);
 });
