@@ -197,6 +197,40 @@ test("the switcher on a svelte page creates a form", async ({ page }) => {
 	await expect(page.getByText("No submissions yet")).toBeVisible();
 });
 
+test("form names are limited to 100 characters and duplicate creations never 500", async ({ page }) => {
+	await page.goto(`/forms/${firstForm.id}/integration`);
+	await page.getByRole("button", { name: new RegExp(firstForm.name) }).click();
+	await page.getByRole("menuitem", { name: "Add form" }).click();
+	const dialog = page.getByRole("dialog", { name: "Create New Form" });
+	await dialog.getByLabel("Form Name").fill("x".repeat(101));
+	await dialog.getByRole("button", { name: "Create Form" }).click();
+	await expect(dialog.getByText("Form name must be 100 characters or fewer")).toBeVisible();
+
+	const action = await dialog.locator("form").getAttribute("action");
+	const field = (await dialog.getByLabel("Form Name").getAttribute("name")) ?? "";
+	const owner = await authedRequest();
+	const longName = await owner.post(`/forms/${firstForm.id}/integration${action}`, {
+		form: { [field]: "y".repeat(101) },
+		headers: { Accept: "text/html" },
+		maxRedirects: 0,
+	});
+	expect(longName.status()).toBeLessThan(500);
+	expect(d1("SELECT id FROM forms WHERE length(name) > 100")).toHaveLength(0);
+
+	const racers = await Promise.all(
+		Array.from({ length: 6 }, () =>
+			owner.post(`/forms/${firstForm.id}/integration${action}`, {
+				form: { [field]: "Race Form" },
+				headers: { Accept: "text/html" },
+				maxRedirects: 0,
+			}),
+		),
+	);
+	await owner.dispose();
+	expect(racers.map((response) => response.status()).filter((status) => status >= 500)).toEqual([]);
+	expect(d1("SELECT id FROM forms WHERE id = 'race-form'")).toHaveLength(1);
+});
+
 test.describe("notification settings", () => {
 	const seededPassword = "seeded-secret";
 	const connectError = "Could not connect to the SMTP server. Check the host and port.";

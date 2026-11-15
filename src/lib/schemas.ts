@@ -25,5 +25,10 @@ export const signUpSchema = v.pipe(
 );
 
 export const createFormSchema = v.object({
-	name: v.pipe(v.string(), v.trim(), v.nonEmpty('Form name is required'))
+	name: v.pipe(
+		v.string(),
+		v.trim(),
+		v.nonEmpty('Form name is required'),
+		v.maxLength(100, 'Form name must be 100 characters or fewer')
+	)
 });
