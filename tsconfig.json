@@ -1,6 +1,6 @@
 {
 	"extends": "$app/tsconfig",
-	"include": ["src", "worker-configuration.d.ts"],
+	"include": ["src", "tests", "playwright.config.ts", "vite.config.ts", "worker-configuration.d.ts"],
 	"compilerOptions": {
 		"strict": true
 	}
