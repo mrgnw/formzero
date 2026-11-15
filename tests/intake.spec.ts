@@ -192,3 +192,22 @@ test.describe("redirect targets", () => {
 		expect(response.headers()["location"]).toBe("/success");
 	});
 });
+
+test.describe("methods", () => {
+	for (const method of ["PUT", "PATCH", "DELETE"]) {
+		test(`${method} is a 405 with CORS headers and stores nothing`, async ({ request }) => {
+			const before = storedCount();
+			const response = await request.fetch(submissionPath(formId), {
+				method,
+				data: { name: "Ada" },
+				headers: originHeaders,
+				maxRedirects: 0,
+			});
+			expect(response.status()).toBe(405);
+			expect(response.headers()["access-control-allow-origin"]).toBe("*");
+			expect(response.headers()["access-control-allow-methods"]).toBe("POST, OPTIONS");
+			expect(await response.json()).toEqual({ error: "Method not allowed" });
+			expect(storedCount()).toBe(before);
+		});
+	}
+});
