@@ -18,7 +18,7 @@ import {
 export const meta: Route.MetaFunction = () => {
   return [
     { title: "Integration | FormZero" },
-    { name: "description", content: "Integrate your form with HTML, JavaScript, React, or Svelte" },
+    { name: "description", content: "Integrate your form with HTML, JavaScript, React, Svelte, or SvelteKit" },
   ];
 };
 
@@ -293,6 +293,7 @@ export const contact = form(
               <TabsTrigger value="javascript">JavaScript</TabsTrigger>
               <TabsTrigger value="react">React</TabsTrigger>
               <TabsTrigger value="svelte">Svelte</TabsTrigger>
+              <TabsTrigger value="sveltekit">SvelteKit</TabsTrigger>
             </TabsList>
 
             <TabsContent value="html" className="mt-3 space-y-3">
@@ -474,8 +475,10 @@ export const contact = form(
                 </p>
                 {renderCodeBlock(svelteFetchExample, "markup")}
               </div>
+            </TabsContent>
+            <TabsContent value="sveltekit" className="mt-3 space-y-4">
               <div className="space-y-2">
-                <h3 className="text-sm font-medium">SvelteKit remote function (experimental)</h3>
+                <h3 className="text-sm font-medium">Remote function (experimental)</h3>
                 <p className="text-xs text-muted-foreground">
                   The server forwards the submission, so the browser never makes a cross-origin request. Needs <code className="rounded bg-muted px-1 py-0.5 text-xs">kit.experimental.remoteFunctions</code> and <code className="rounded bg-muted px-1 py-0.5 text-xs">compilerOptions.experimental.async</code> in <code className="rounded bg-muted px-1 py-0.5 text-xs">svelte.config.js</code>, plus <code className="rounded bg-muted px-1 py-0.5 text-xs">valibot</code>.
                 </p>
