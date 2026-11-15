@@ -22,7 +22,7 @@ export function FormNav() {
       title: "Submissions",
       url: `/forms/${formId}/submissions`,
       icon: Database,
-      reloadDocument: false,
+      reloadDocument: true,
     },
     {
       title: "Integration",

@@ -5,7 +5,6 @@ const DAY = 24 * HOUR;
 const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
 	['year', 365 * DAY],
 	['month', 30 * DAY],
-	['week', 7 * DAY],
 	['day', DAY],
 	['hour', HOUR],
 	['minute', MINUTE]

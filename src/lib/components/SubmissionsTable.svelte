@@ -137,7 +137,7 @@
 				{:else}
 					<Table.Row>
 						<Table.Cell colspan={fields.length + 2} class="h-24 text-center">
-							{submissions.length === 0 ? 'No submissions yet.' : 'No matching submissions.'}
+							No matching submissions.
 						</Table.Cell>
 					</Table.Row>
 				{/each}
