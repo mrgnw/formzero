@@ -7,25 +7,53 @@ export type Submission = {
 	created_at: number;
 };
 
-export type SubmissionStats = {
-	total: number;
-	thisWeek: number;
-	thisMonth: number;
-	weekTrend: number;
-	monthTrend: number;
+export type SortKey = 'created_at' | 'email';
+export type Direction = 'ascending' | 'descending';
+export type Sort = { key: SortKey; direction: Direction };
+
+export type SubmissionPage = {
+	submissions: Submission[];
+	matching: number;
+	page: number;
+	pageCount: number;
 };
 
-export type DailyCount = { date: string; count: number };
+export const PAGE_SIZE = 50;
+export const CSV_BATCH_SIZE = 1000;
+export const CSV_MAX_ROWS = 100_000;
 
-const DAY = 24 * 60 * 60 * 1000;
+const SORTS: Record<string, Sort> = {
+	time: { key: 'created_at', direction: 'ascending' },
+	'-time': { key: 'created_at', direction: 'descending' },
+	email: { key: 'email', direction: 'ascending' },
+	'-email': { key: 'email', direction: 'descending' }
+};
 
-export async function listSubmissions(formId: string): Promise<Submission[]> {
-	const { results } = await env.DB.prepare(
-		'SELECT id, form_id, data, created_at FROM submissions WHERE form_id = ? ORDER BY created_at DESC'
-	)
-		.bind(formId)
-		.all<Omit<Submission, 'data'> & { data: string }>();
-	return results.map((row) => ({ ...row, data: parseData(row.data) }));
+const OBJECT_DATA = "CASE WHEN json_valid(data) THEN CASE json_type(data) WHEN 'object' THEN data END END";
+
+const EMAIL = `json_extract(${OBJECT_DATA}, '$.email') COLLATE NOCASE`;
+
+const ORDER_BY: Record<SortKey, Record<Direction, string>> = {
+	created_at: { ascending: 'created_at ASC, id ASC', descending: 'created_at DESC, id DESC' },
+	email: {
+		ascending: `${EMAIL} ASC, created_at DESC, id DESC`,
+		descending: `${EMAIL} DESC, created_at DESC, id DESC`
+	}
+};
+
+type Row = Omit<Submission, 'data'> & { data: string };
+
+export function parseSort(param: string | null): Sort {
+	return SORTS[param ?? ''] ?? SORTS['-time'];
+}
+
+export function parsePage(param: string | null) {
+	const page = Number(param);
+	return Number.isSafeInteger(page) && page > 0 ? page : 1;
+}
+
+function toSubmission(row: Row): Submission {
+	return { ...row, data: parseData(row.data) };
 }
 
 export function parseData(text: string): Record<string, unknown> {
@@ -37,43 +65,32 @@ export function parseData(text: string): Record<string, unknown> {
 	}
 }
 
-export async function deleteSubmission(formId: string, id: string) {
-	const result = await env.DB.prepare('DELETE FROM submissions WHERE id = ? AND form_id = ?').bind(id, formId).run();
-	return result.meta.changes > 0;
+function likePattern(query: string) {
+	return `%${query.replace(/[\\%_]/g, '\\$&')}%`;
 }
 
-function countBetween(submissions: Submission[], from: number, to = Infinity) {
-	return submissions.filter((s) => s.created_at >= from && s.created_at < to).length;
-}
-
-function trend(current: number, previous: number) {
-	if (previous === 0) return current > 0 ? 100 : 0;
-	return Math.round(((current - previous) / previous) * 100);
-}
-
-export function submissionStats(submissions: Submission[], now: number): SubmissionStats {
-	const thisWeek = countBetween(submissions, now - 7 * DAY);
-	const previousWeek = countBetween(submissions, now - 14 * DAY, now - 7 * DAY);
-	const thisMonth = countBetween(submissions, now - 30 * DAY);
-	const previousMonth = countBetween(submissions, now - 60 * DAY, now - 30 * DAY);
+export async function listSubmissions(formId: string, query: string, sort: Sort, page: number): Promise<SubmissionPage> {
+	const search = query ? " AND (data LIKE ?2 ESCAPE '\\' OR id LIKE ?2 ESCAPE '\\')" : '';
+	const params = query ? [formId, likePattern(query)] : [formId];
+	const [rows, count] = await env.DB.batch<Row | { matching: number }>([
+		env.DB.prepare(
+			`SELECT id, form_id, data, created_at FROM submissions WHERE form_id = ?1${search}
+			ORDER BY ${ORDER_BY[sort.key][sort.direction]} LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}`
+		).bind(...params),
+		env.DB.prepare(`SELECT COUNT(*) AS matching FROM submissions WHERE form_id = ?1${search}`).bind(...params)
+	]);
+	const matching = (count.results[0] as { matching: number }).matching;
 	return {
-		total: submissions.length,
-		thisWeek,
-		thisMonth,
-		weekTrend: trend(thisWeek, previousWeek),
-		monthTrend: trend(thisMonth, previousMonth)
+		submissions: (rows.results as Row[]).map(toSubmission),
+		matching,
+		page,
+		pageCount: Math.max(1, Math.ceil(matching / PAGE_SIZE))
 	};
 }
 
-export function dailyCounts(submissions: Submission[], now: number): DailyCount[] {
-	return Array.from({ length: 30 }, (_, index) => {
-		const date = new Date(now - (29 - index) * DAY);
-		const startOfDay = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
-		return {
-			date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }),
-			count: countBetween(submissions, startOfDay, startOfDay + DAY)
-		};
-	});
+export async function deleteSubmission(formId: string, id: string) {
+	const result = await env.DB.prepare('DELETE FROM submissions WHERE id = ? AND form_id = ?').bind(id, formId).run();
+	return result.meta.changes > 0;
 }
 
 function escapeCsv(value: unknown) {
@@ -87,10 +104,49 @@ function userCell(value: unknown) {
 	return escapeCsv(/^[=+\-@\t\r]/.test(text) ? `'${text}` : text);
 }
 
-export function submissionsCsv(submissions: Submission[]) {
-	const dataKeys = [...new Set(submissions.flatMap((s) => Object.keys(s.data)))].sort();
-	const rows = submissions.map((s) =>
-		[escapeCsv(s.id), escapeCsv(new Date(s.created_at).toISOString()), ...dataKeys.map((key) => userCell(s.data[key]))].join(',')
-	);
-	return [['ID', 'Created At', ...dataKeys.map(userCell)].join(','), ...rows].join('\n');
+async function csvKeys(formId: string) {
+	const { results } = await env.DB.prepare(
+		`SELECT DISTINCT key FROM (
+			SELECT data FROM submissions WHERE form_id = ? ORDER BY created_at DESC, id DESC LIMIT ?
+		), json_each(${OBJECT_DATA})`
+	)
+		.bind(formId, CSV_MAX_ROWS)
+		.all<{ key: string }>();
+	return results.map((row) => row.key).sort();
+}
+
+async function csvBatch(formId: string, after: { created_at: number; id: string }, limit: number) {
+	const { results } = await env.DB.prepare(
+		`SELECT id, form_id, data, created_at FROM submissions
+		WHERE form_id = ? AND (created_at < ? OR (created_at = ? AND id < ?))
+		ORDER BY created_at DESC, id DESC LIMIT ?`
+	)
+		.bind(formId, after.created_at, after.created_at, after.id, limit)
+		.all<Row>();
+	return results;
+}
+
+export async function submissionsCsv(formId: string): Promise<ReadableStream<Uint8Array>> {
+	const keys = await csvKeys(formId);
+	const encoder = new TextEncoder();
+	let cursor = { created_at: Number.MAX_SAFE_INTEGER, id: '' };
+	let remaining = CSV_MAX_ROWS;
+	return new ReadableStream({
+		start(controller) {
+			controller.enqueue(encoder.encode(['ID', 'Created At', ...keys.map(userCell)].join(',')));
+		},
+		async pull(controller) {
+			const rows = await csvBatch(formId, cursor, Math.min(CSV_BATCH_SIZE, remaining));
+			const lines = rows.map(toSubmission).map(
+				(s) =>
+					'\n' +
+					[escapeCsv(s.id), escapeCsv(new Date(s.created_at).toISOString()), ...keys.map((key) => userCell(s.data[key]))].join(',')
+			);
+			if (lines.length > 0) controller.enqueue(encoder.encode(lines.join('')));
+			remaining -= rows.length;
+			const last = rows.at(-1);
+			if (!last || rows.length < CSV_BATCH_SIZE || remaining === 0) return controller.close();
+			cursor = last;
+		}
+	});
 }

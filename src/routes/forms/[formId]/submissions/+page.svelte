@@ -29,7 +29,7 @@
 
 	<SubmissionsChart days={data.days} />
 
-	{#if data.submissions.length === 0}
+	{#if data.stats.total === 0}
 		<div class="flex min-w-0 flex-1 items-center justify-center py-12">
 			<Empty.Root>
 				<Empty.Header>
@@ -45,7 +45,14 @@
 			</Empty.Root>
 		</div>
 	{:else}
-		<SubmissionsTable submissions={data.submissions} now={data.now} onDelete={(submission) => (pendingDelete = submission)}>
+		<SubmissionsTable
+			table={data.table}
+			query={data.query}
+			sort={data.sort}
+			total={data.stats.total}
+			now={data.now}
+			onDelete={(submission) => (pendingDelete = submission)}
+		>
 			{#snippet toolbar()}
 				<Button
 					variant="outline"

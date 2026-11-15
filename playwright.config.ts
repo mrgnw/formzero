@@ -15,6 +15,7 @@ export default defineConfig({
 	use: { baseURL },
 	projects: [
 		{ name: "setup", testMatch: /auth\.setup\.ts/ },
+		{ name: "stats", testMatch: /stats\.spec\.ts/ },
 		{ name: "dashboard", testMatch: /dashboard\.spec\.ts/, dependencies: ["setup"], use: signedIn },
 		{ name: "auth", testMatch: /auth\.spec\.ts/, dependencies: ["setup"], use: signedIn },
 		{ name: "api", testMatch: /api\.spec\.ts/, dependencies: ["setup"], use: signedIn },

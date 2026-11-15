@@ -1,6 +1,6 @@
 <script lang="ts">
 	import * as Card from '#lib/components/ui/card/index.js';
-	import type { DailyCount } from '#lib/server/dashboard.js';
+	import type { DailyCount } from '#lib/server/stats.js';
 
 	let { days }: { days: DailyCount[] } = $props();
 
