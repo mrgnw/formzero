@@ -9,7 +9,6 @@
     "app/types/**/*",
     "app/**/.server/**/*",
     "app/**/.client/**/*",
-    "src/lib/server/email.ts",
     "worker-configuration.d.ts"
   ],
   "compilerOptions": {

@@ -7,10 +7,3 @@ export type Settings = {
   smtp_secure: number
   updated_at: number
 }
-
-export type EmailConfig = {
-  notification_email: string
-  notification_email_password: string
-  smtp_host: string
-  smtp_port: number
-}
