@@ -9,7 +9,7 @@ const TEST_EMAIL_ERRORS = {
 	port: 'Use SMTP port 465, 587 or 2525.',
 	connect: 'Could not connect to the SMTP server. Check the host and port.',
 	auth: 'The SMTP server rejected the email or password.',
-	tls: 'Could not set up a secure (TLS) connection with the SMTP server.',
+	tls: 'TLS required: the SMTP server did not accept a secure connection. Use STARTTLS on 587 or 2525, or implicit TLS on 465.',
 	timeout: 'The SMTP server did not respond in time.',
 	other: 'Could not send the test email.'
 };

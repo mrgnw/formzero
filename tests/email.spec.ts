@@ -69,7 +69,7 @@ test("SMTP failures are logged as classified fields, not raw server responses", 
 	}
 	expect(logged).toEqual([
 		["Error sending test email:", { code: "ETLS", command: "STARTTLS", responseCode: 502 }],
-		["Error sending notification email:", { code: "ETLS", command: "STARTTLS", responseCode: 502 }],
+		["Notification email not sent, TLS required:", { code: "ETLS", command: "STARTTLS", responseCode: 502 }],
 	]);
 });
 
