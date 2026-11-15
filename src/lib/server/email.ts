@@ -7,7 +7,7 @@ import type { SubmissionEmailData } from "../../../app/types/submission"
  */
 export async function sendTestEmail(
   config: EmailConfig
-): Promise<{ success: boolean; error?: string; messageId?: string }> {
+): Promise<{ success: boolean; error?: string; messageId?: string; failure?: SmtpFailure }> {
   try {
     // Create nodemailer transporter
     const transporter = nodemailer.createTransport({
@@ -94,7 +94,18 @@ export async function sendTestEmail(
       }
     }
 
-    return { success: false, error: errorMessage }
+    return { success: false, error: errorMessage, failure: smtpFailure(error) }
+  }
+}
+
+export type SmtpFailure = { code?: string; command?: string; responseCode?: number }
+
+function smtpFailure(error: unknown): SmtpFailure {
+  const { code, command, responseCode } = (error ?? {}) as Record<string, unknown>
+  return {
+    code: typeof code === "string" ? code : undefined,
+    command: typeof command === "string" ? command : undefined,
+    responseCode: typeof responseCode === "number" ? responseCode : undefined,
   }
 }
 
