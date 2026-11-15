@@ -155,3 +155,25 @@ test("the success and error pages render", async ({ page }) => {
 	await page.goto("/error?error=form_not_found");
 	await expect(page.getByRole("heading", { name: "Form Not Found" })).toBeVisible();
 });
+
+test.describe("result pages", () => {
+	test("/success confirms the submission", async ({ page }) => {
+		await page.goto("/success");
+		await expect(page).toHaveTitle("Submission Successful");
+		await expect(page.getByRole("heading", { name: "Submission Successful!" })).toBeVisible();
+	});
+
+	const errors = {
+		form_not_found: "Form Not Found",
+		unsupported_content_type: "Unsupported Format",
+		internal_error: "Something Went Wrong",
+		toString: "Something Went Wrong",
+	};
+
+	for (const [error, heading] of Object.entries(errors)) {
+		test(`/error?error=${error} shows "${heading}"`, async ({ page }) => {
+			await page.goto(`/error?error=${error}`);
+			await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+		});
+	}
+});
