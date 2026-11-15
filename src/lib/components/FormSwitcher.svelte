@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import ChevronsUpDown from '@lucide/svelte/icons/chevrons-up-down';
+	import Plus from '@lucide/svelte/icons/plus';
+	import CreateFormDialog from '#lib/components/CreateFormDialog.svelte';
 	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 	import * as Sidebar from '#lib/components/ui/sidebar/index.js';
 	import type { FormSummary } from '#lib/server/forms.js';
@@ -8,6 +10,7 @@
 	let { forms }: { forms: FormSummary[] } = $props();
 
 	const sidebar = Sidebar.useSidebar();
+	let dialogOpen = $state(false);
 	const activeForm = $derived(forms.find((form) => form.id === page.params.formId) ?? forms[0]);
 </script>
 
@@ -47,7 +50,16 @@
 						{/snippet}
 					</DropdownMenu.Item>
 				{/each}
+				<DropdownMenu.Separator />
+				<DropdownMenu.Item class="gap-2 p-2" onSelect={() => (dialogOpen = true)}>
+					<div class="flex size-6 items-center justify-center rounded-md border bg-transparent">
+						<Plus class="size-4" />
+					</div>
+					<div class="font-medium text-muted-foreground">Add form</div>
+				</DropdownMenu.Item>
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
 	</Sidebar.MenuItem>
 </Sidebar.Menu>
+
+<CreateFormDialog bind:open={dialogOpen} />
