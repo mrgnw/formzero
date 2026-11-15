@@ -24,7 +24,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   const { formId } = params
   const database = context.cloudflare.env.DB
 
-  await requireAuth(request, database)
+  await requireAuth(request, context.cloudflare.env)
 
   // Fetch all submissions for this form
   const submissions = await database

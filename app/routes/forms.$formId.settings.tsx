@@ -28,7 +28,7 @@ export const meta: Route.MetaFunction = () => {
 export async function loader({ request, params, context }: Route.LoaderArgs) {
   const database = context.cloudflare.env.DB
 
-  await requireAuth(request, database)
+  await requireAuth(request, context.cloudflare.env)
 
   const form = await database
     .prepare("SELECT id, name FROM forms WHERE id = ?")
@@ -45,7 +45,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
 export async function action({ request, params, context }: Route.ActionArgs) {
   const database = context.cloudflare.env.DB
 
-  await requireAuth(request, database)
+  await requireAuth(request, context.cloudflare.env)
 
   const { formId } = params
 

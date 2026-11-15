@@ -2,7 +2,7 @@ import { data, type ActionFunctionArgs, type LoaderFunctionArgs } from 'react-ro
 import { getAuth, getUserCount } from '#/lib/auth.server'
 
 async function handleAuthRequest(request: Request, context: any) {
-    const auth = getAuth({ database: context.cloudflare.env.DB })
+    const auth = getAuth(context.cloudflare.env)
     const url = new URL(request.url)
 
     // Intercept signup requests to enforce single-user constraint
