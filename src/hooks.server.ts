@@ -4,6 +4,16 @@ import type { Handle } from '@sveltejs/kit/hooks';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { getAuth } from '#lib/server/auth.js';
 
+const FRAMEABLE_PATHS = ['/api/forms/', '/success', '/error'];
+
+function setSecurityHeaders({ headers }: Response, pathname: string) {
+	headers.set('X-Content-Type-Options', 'nosniff');
+	headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+	if (FRAMEABLE_PATHS.some((path) => pathname.startsWith(path))) return;
+	headers.set('X-Frame-Options', 'DENY');
+	headers.append('Content-Security-Policy', "frame-ancestors 'none'");
+}
+
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 function isCrossSiteWrite({ request, url }: RequestEvent) {
@@ -18,5 +28,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		const session = await getAuth().api.getSession({ headers: event.request.headers });
 		event.locals.user = session?.user ?? null;
 	}
-	return svelteKitHandler({ auth: getAuth(), event, resolve, building });
+	const response = await svelteKitHandler({ auth: getAuth(), event, resolve, building });
+	setSecurityHeaders(response, event.url.pathname);
+	return response;
 };
