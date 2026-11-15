@@ -2,6 +2,7 @@
 	import { createForm } from '#lib/forms.remote.js';
 	import { createFormSchema } from '#lib/schemas.js';
 	import AuthCard from '#lib/components/AuthCard.svelte';
+	import FieldIssues from '#lib/components/FieldIssues.svelte';
 	import FormIssues from '#lib/components/FormIssues.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
@@ -20,7 +21,15 @@
 		<div class="space-y-4">
 			<div class="space-y-2">
 				<Label for="name">Form Name</Label>
-				<Input id="name" {...name.as('text')} required placeholder="Contact Form" autofocus />
+				<Input
+					id="name"
+					{...name.as('text')}
+					aria-describedby={name.issues() ? 'name-issues' : undefined}
+					required
+					placeholder="Contact Form"
+					autofocus
+				/>
+				<FieldIssues id="name-issues" issues={name.issues()} />
 			</div>
 		</div>
 
