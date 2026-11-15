@@ -2,7 +2,7 @@ import { building } from '$app/env';
 import type { RequestEvent } from '@sveltejs/kit';
 import type { Handle } from '@sveltejs/kit/hooks';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
-import { getAuth, limitAuthAttempt, TOO_MANY_ATTEMPTS } from '#lib/server/auth.js';
+import { getAuth, limitAuthAttempt, tooManyAttempts } from '#lib/server/auth.js';
 
 const FRAMEABLE_PATHS = ['/api/forms/', '/success', '/error'];
 
@@ -45,7 +45,7 @@ async function rejectLimitedAuthAttempt({ request, url }: RequestEvent) {
 	const limit = await limitAuthAttempt(request, await attemptedEmail(request));
 	if (limit.allowed) return null;
 	return Response.json(
-		{ code: 'TOO_MANY_REQUESTS', message: TOO_MANY_ATTEMPTS },
+		{ code: 'TOO_MANY_REQUESTS', message: tooManyAttempts(limit.retryAfter) },
 		{ status: 429, headers: { 'Retry-After': String(limit.retryAfter) } }
 	);
 }

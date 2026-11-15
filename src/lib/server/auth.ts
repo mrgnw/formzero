@@ -11,7 +11,11 @@ export const AUTH_ATTEMPTS_PER_IP = 10;
 export const AUTH_IP_WINDOW_SECONDS = 600;
 export const AUTH_ATTEMPTS_PER_EMAIL = 100;
 export const AUTH_EMAIL_WINDOW_SECONDS = 3600;
-export const TOO_MANY_ATTEMPTS = 'Too many attempts. Please try again later.';
+
+export function tooManyAttempts(retryAfter: number) {
+	const minutes = Math.max(1, Math.ceil(retryAfter / 60));
+	return `Too many attempts. Try again in ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`;
+}
 
 export async function userCount() {
 	const row = await env.DB.prepare('SELECT COUNT(*) AS count FROM user').first<{ count: number }>();

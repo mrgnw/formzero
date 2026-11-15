@@ -63,7 +63,10 @@ test.describe("signed out", () => {
 		});
 		expect(limited.status()).toBe(429);
 		expect(Number(limited.headers()["retry-after"])).toBeGreaterThan(0);
-		expect((await limited.json()).code).toBe("TOO_MANY_REQUESTS");
+		expect(await limited.json()).toEqual({
+			code: "TOO_MANY_REQUESTS",
+			message: "Too many attempts. Try again in 10 minutes.",
+		});
 
 		const otherIp = await request.post("/api/auth/sign-in/email", {
 			headers: { ...originHeaders, "CF-Connecting-IP": "198.51.100.78" },
@@ -98,8 +101,8 @@ test.describe("signed out", () => {
 			await page.getByLabel("Email").fill(email);
 			await page.getByLabel("Password").fill("not-the-password");
 			await page.getByRole("button", { name: "Sign In" }).click();
-			const expected = attempt <= 10 ? "Invalid email or password" : "Too many attempts. Please try again later.";
-			await expect(page.getByText(expected), `attempt ${attempt}`).toBeVisible();
+			const expected = attempt <= 10 ? "Invalid email or password" : "Too many attempts. Try again in 10 minutes.";
+			await expect(page.getByText(expected, { exact: true }), `attempt ${attempt}`).toBeVisible();
 		}
 		await context.close();
 	});
