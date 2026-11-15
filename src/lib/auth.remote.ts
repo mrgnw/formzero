@@ -1,7 +1,7 @@
 import { form, getRequestEvent } from '$app/server';
 import { invalid, redirect } from '@sveltejs/kit';
 import { APIError } from 'better-auth/api';
-import { getAuth } from '#lib/server/auth.js';
+import { getAuth, requireUser } from '#lib/server/auth.js';
 import { signInSchema, signUpSchema } from '#lib/schemas.js';
 
 function authFailure(error: unknown, fallback: string, unexpected: string): never {
@@ -28,4 +28,10 @@ export const signUp = form(signUpSchema, async ({ name, email, _password }) => {
 		authFailure(error, 'Failed to create account', 'Failed to create account. Please try again.');
 	}
 	redirect(303, '/forms');
+});
+
+export const signOut = form(async () => {
+	requireUser();
+	await getAuth().api.signOut({ headers: getRequestEvent().request.headers });
+	redirect(303, '/login');
 });
