@@ -68,8 +68,13 @@ test.describe("signed out", () => {
 		await page.getByRole("button", { name: "Sign In" }).click();
 		await expect(page).toHaveURL(/\/forms\/[^/]+\/submissions$/);
 
-		await page.getByRole("button", { name: new RegExp(credentials.name) }).click();
-		await page.getByRole("menuitem", { name: "Log out" }).click();
+		const userMenu = page.getByRole("button", { name: new RegExp(credentials.name) });
+		const logOut = page.getByRole("menuitem", { name: "Log out" });
+		await expect(async () => {
+			if (!(await logOut.isVisible())) await userMenu.click();
+			await expect(logOut).toBeVisible({ timeout: 1_000 });
+		}).toPass();
+		await logOut.click();
 		await expect(page).toHaveURL(/\/login$/);
 
 		await page.goto("/forms");
