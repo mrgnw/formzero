@@ -61,6 +61,26 @@ test.describe("signed out", () => {
 		await expect(page).toHaveURL(/\/login$/);
 	});
 
+	test("sign-out sets every clearing cookie through the catch-all", async ({ request }) => {
+		const signIn = await request.post("/api/auth/sign-in/email", {
+			data: { email: credentials.email, password: credentials.password },
+			headers: originHeaders,
+		});
+		expect(signIn.status()).toBe(200);
+
+		const signOut = await request.post("/api/auth/sign-out", { data: {}, headers: originHeaders });
+		expect(signOut.status()).toBe(200);
+		const cookieNames = signOut
+			.headersArray()
+			.filter(({ name }) => name.toLowerCase() === "set-cookie")
+			.map(({ value }) => value.split("=")[0]);
+		expect(cookieNames.sort()).toEqual([
+			"better-auth.dont_remember",
+			"better-auth.session_data",
+			"better-auth.session_token",
+		]);
+	});
+
 	test("login, then logout from the user menu", async ({ page }) => {
 		await page.goto("/login");
 		await page.getByLabel("Email").fill(credentials.email);
