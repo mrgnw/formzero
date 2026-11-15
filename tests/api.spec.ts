@@ -179,6 +179,16 @@ test.describe("result pages", () => {
 });
 
 test.describe("CSV export", () => {
+	async function exportCsv(formName: string, data: Record<string, string>) {
+		const owner = await authedRequest();
+		const csvFormId = await createForm(owner, formName);
+		const created = await owner.post(submissionPath(csvFormId), { data });
+		const { id } = await created.json();
+		const body = await (await owner.get(`/forms/${csvFormId}/submissions.csv`)).text();
+		await owner.dispose();
+		return { id, body };
+	}
+
 	test("a signed-out visitor is sent to /login", async ({ request }) => {
 		const response = await request.get(`/forms/${formId}/submissions.csv`, { maxRedirects: 0 });
 		expect(response.status()).toBe(302);
@@ -211,5 +221,11 @@ test.describe("CSV export", () => {
 			new RegExp(`^ID,Created At,alpha,zeta\\n${id},\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z,"a, ""quoted""\\nline",plain$`),
 		);
 		await owner.dispose();
+	});
+
+	test("header cells are escaped and a lone carriage return is quoted", async () => {
+		const { id, body } = await exportCsv("CSV Escaping", { 'a,"b': "x\ry" });
+		expect(body.split("\n")[0]).toBe('ID,Created At,"a,""b"');
+		expect(body).toMatch(new RegExp(`\\n${id},[^,]+,"x\\ry"$`));
 	});
 });

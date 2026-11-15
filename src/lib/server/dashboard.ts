@@ -69,7 +69,7 @@ export function dailyCounts(submissions: Submission[], now: number): DailyCount[
 
 function escapeCsv(value: unknown) {
 	const text = value === undefined || value === null ? '' : String(value);
-	if (text.includes(',') || text.includes('"') || text.includes('\n')) return `"${text.replace(/"/g, '""')}"`;
+	if (/[",\r\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
 	return text;
 }
 
@@ -78,5 +78,5 @@ export function submissionsCsv(submissions: Submission[]) {
 	const rows = submissions.map((s) =>
 		[escapeCsv(s.id), escapeCsv(new Date(s.created_at).toISOString()), ...dataKeys.map((key) => escapeCsv(s.data[key]))].join(',')
 	);
-	return [['ID', 'Created At', ...dataKeys].join(','), ...rows].join('\n');
+	return [['ID', 'Created At', ...dataKeys.map(escapeCsv)].join(','), ...rows].join('\n');
 }
