@@ -28,6 +28,11 @@ export async function listSubmissions(formId: string): Promise<Submission[]> {
 	return results.map((row) => ({ ...row, data: JSON.parse(row.data) }));
 }
 
+export async function deleteSubmission(formId: string, id: string) {
+	const result = await env.DB.prepare('DELETE FROM submissions WHERE id = ? AND form_id = ?').bind(id, formId).run();
+	return result.meta.changes > 0;
+}
+
 function countBetween(submissions: Submission[], from: number, to = Infinity) {
 	return submissions.filter((s) => s.created_at >= from && s.created_at < to).length;
 }
