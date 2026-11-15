@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { createServer } from "node:net";
 import { type APIRequestContext, expect, test } from "@playwright/test";
 import { authedRequest, createForm, d1, emptyStorageState, originHeaders, submissionPath } from "./support";
 
@@ -291,11 +292,18 @@ test.describe("rate limits", () => {
 		}
 	});
 
-	test("notification sends are counted per form against the hourly cap", async ({ request }) => {
+	test("notification sends stop at 20 per form per hour while submissions are still stored", async ({ request }) => {
 		const notifiedForm = createForm("Notification Cap");
+		let smtpConnections = 0;
+		const smtp = createServer((socket) => {
+			smtpConnections++;
+			socket.destroy();
+		});
+		const port = 2525;
+		await new Promise<void>((resolve, reject) => smtp.once("error", reject).listen(port, "127.0.0.1", resolve));
 		const saved = d1("SELECT * FROM settings");
 		d1(
-			"INSERT OR REPLACE INTO settings (id, notification_email, notification_email_password, smtp_host, smtp_port, smtp_secure, updated_at) VALUES ('global', 'cap@example.org', 'secret', '127.0.0.1', 1, 1, 1700000000000)",
+			`INSERT OR REPLACE INTO settings (id, notification_email, notification_email_password, smtp_host, smtp_port, smtp_secure, updated_at) VALUES ('global', 'cap@example.org', 'secret', '127.0.0.1', ${port}, 1, 1700000000000)`,
 		);
 		try {
 			for (let attempt = 1; attempt <= 22; attempt++) {
@@ -308,8 +316,12 @@ test.describe("rate limits", () => {
 			await expect
 				.poll(() => d1(`SELECT count FROM rate_limits WHERE key = 'notify:${notifiedForm}'`)[0]?.count)
 				.toBe(22);
+			await expect.poll(() => smtpConnections).toBe(20);
+			await new Promise((resolve) => setTimeout(resolve, 1000));
+			expect(smtpConnections).toBe(20);
 			expect(d1(`SELECT COUNT(*) AS count FROM submissions WHERE form_id = '${notifiedForm}'`)[0].count).toBe(22);
 		} finally {
+			smtp.close();
 			d1("DELETE FROM settings");
 			for (const row of saved) {
 				const columns = Object.keys(row);
