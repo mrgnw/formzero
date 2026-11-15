@@ -1,5 +1,5 @@
-import { type Page, expect, test } from "@playwright/test";
-import { authedRequest, credentials, d1, firstForm, origin, postSubmission } from "./support";
+import { type Page, expect, request as playwrightRequest, test } from "@playwright/test";
+import { authedRequest, credentials, d1, emptyStorageState, firstForm, origin, originHeaders, postSubmission, storageStatePath } from "./support";
 
 test.describe.configure({ mode: "serial" });
 
@@ -198,8 +198,17 @@ test("the switcher on a svelte page creates a form", async ({ page }) => {
 });
 
 test.describe("notification settings", () => {
+	const seededPassword = "seeded-secret";
+
+	function seedSettings(host: string, port: number) {
+		d1(
+			`INSERT OR REPLACE INTO settings (id, notification_email, notification_email_password, smtp_host, smtp_port, smtp_secure, updated_at) VALUES ('global', 'seeded@example.org', '${seededPassword}', '${host}', ${port}, 1, 1700000000000)`,
+		);
+		expect(d1("SELECT id FROM settings")).toHaveLength(1);
+	}
+
 	async function openSettings(page: Page) {
-		await page.goto(`/forms/${firstForm.id}/submissions`);
+		await page.goto(`/forms/${firstForm.id}/integration`);
 		await page.getByRole("button", { name: new RegExp(credentials.name) }).click();
 		await page.getByRole("menuitem", { name: "Settings" }).click();
 		const dialog = page.getByRole("dialog", { name: "Settings" });
@@ -208,7 +217,6 @@ test.describe("notification settings", () => {
 	}
 
 	test("save stays disabled until a test passes; an unreachable host shows an error", async ({ page }) => {
-		test.fixme(true, "needs stage 7b: no page has a user menu with Settings");
 		const dialog = await openSettings(page);
 		await dialog.getByLabel("Your Email").fill("owner@unreachable.invalid");
 		await dialog.getByLabel("SMTP Password").fill("irrelevant");
@@ -217,6 +225,7 @@ test.describe("notification settings", () => {
 
 		const save = dialog.getByRole("button", { name: "Save Settings" });
 		await expect(save).toBeDisabled();
+		await expect(dialog.getByText("Send a test email first to verify your settings")).toBeVisible();
 
 		await dialog.getByRole("button", { name: "Send test email" }).click();
 		await expect(dialog.getByText(/cannot connect/i)).toBeVisible();
@@ -224,12 +233,83 @@ test.describe("notification settings", () => {
 		await expect(save).toBeDisabled();
 	});
 
+	test("the stored password never reaches the browser", async ({ page }) => {
+		seedSettings("127.0.0.1", 1);
+		const bodies: string[] = [];
+		page.on("response", async (response) => {
+			bodies.push(await response.text().catch(() => ""));
+		});
+
+		const dialog = await openSettings(page);
+		const password = dialog.getByLabel("SMTP Password");
+		await expect(dialog.getByLabel("Your Email")).toHaveValue("seeded@example.org");
+		await expect(password).toHaveValue("");
+		await expect(password).toHaveAttribute("placeholder", "Leave blank to keep the saved password");
+
+		await dialog.getByRole("button", { name: "Send test email" }).click();
+		await expect(dialog.getByText(/cannot connect/i)).toBeVisible();
+		expect(bodies.some((body) => body.includes(seededPassword))).toBe(false);
+	});
+
+	test("a blank password is refused when the host or port changes", async ({ page }) => {
+		seedSettings("127.0.0.1", 1);
+		const dialog = await openSettings(page);
+		await dialog.getByLabel("SMTP Port").fill("2");
+
+		const sendTest = dialog.getByRole("button", { name: "Send test email" });
+		await expect(sendTest).toBeDisabled();
+		await expect(dialog.getByLabel("SMTP Password")).toHaveAttribute("placeholder", "Enter your SMTP password");
+
+		await sendTest.evaluate((button: HTMLButtonElement) => (button.disabled = false));
+		await dialog.getByLabel("SMTP Password").evaluate((input: HTMLInputElement) => (input.required = false));
+		await sendTest.click();
+		await expect(dialog.getByText("SMTP password is required")).toBeVisible();
+		await expect(dialog.getByText(/cannot connect/i)).toHaveCount(0);
+	});
+
+	test("settings remote calls are refused cross-origin and when signed out", async ({ page }) => {
+		seedSettings("127.0.0.1", 1);
+		const queryUrl = page.waitForRequest((request) => request.url().includes("/_app/remote/"));
+		const dialog = await openSettings(page);
+		const remoteQuery = (await queryUrl).url();
+		const action = await dialog.locator("form").first().getAttribute("action");
+		expect(action).toContain("?/remote=");
+
+		const owner = await playwrightRequest.newContext({ baseURL: origin, storageState: storageStatePath });
+		const fields = { intent: "save", notification_email: "evil@example.org", _password: "x", smtp_host: "evil.example", "n:smtp_port": "25" };
+		const pagePost = await owner.post(`/forms/${firstForm.id}/integration${action}`, {
+			form: fields,
+			headers: { Origin: "https://attacker.example", Accept: "text/html" },
+			maxRedirects: 0,
+		});
+		expect(pagePost.status()).toBe(403);
+		const remotePost = await owner.post(new URL(remoteQuery).pathname, {
+			data: {},
+			headers: { Origin: "https://attacker.example" },
+			maxRedirects: 0,
+		});
+		expect(remotePost.status()).toBe(403);
+		await owner.dispose();
+
+		const stranger = await playwrightRequest.newContext({ baseURL: origin, storageState: emptyStorageState });
+		const signedOutQuery = await stranger.get(remoteQuery, { maxRedirects: 0 });
+		const signedOutBody = await signedOutQuery.text();
+		expect(signedOutBody).not.toContain("seeded@example.org");
+		expect(signedOutBody).toContain("/login");
+		const signedOutPost = await stranger.post(`/forms/${firstForm.id}/integration${action}`, {
+			form: fields,
+			headers: { ...originHeaders, Accept: "text/html" },
+			maxRedirects: 0,
+		});
+		expect(signedOutPost.status()).toBe(302);
+		expect(signedOutPost.headers()["location"]).toBe("/login");
+		await stranger.dispose();
+
+		expect(d1("SELECT notification_email FROM settings")).toEqual([{ notification_email: "seeded@example.org" }]);
+	});
+
 	test("disable notifications clears a seeded row", async ({ page }) => {
-		test.fixme(true, "needs stage 7b: no page has a user menu with Settings");
-		d1(
-			"INSERT OR REPLACE INTO settings (id, notification_email, notification_email_password, smtp_host, smtp_port, smtp_secure, updated_at) VALUES ('global', 'seeded@example.org', 'seeded-secret', 'smtp.example.org', 587, 1, 1700000000000)",
-		);
-		expect(d1("SELECT id FROM settings")).toHaveLength(1);
+		seedSettings("smtp.example.org", 587);
 
 		const dialog = await openSettings(page);
 		await expect(dialog.getByLabel("Your Email")).toHaveValue("seeded@example.org");
@@ -237,6 +317,7 @@ test.describe("notification settings", () => {
 
 		await expect.poll(() => d1("SELECT id FROM settings").length).toBe(0);
 		await expect(dialog.getByRole("button", { name: "Disable Notifications" })).toHaveCount(0);
+		await expect(dialog.getByLabel("Your Email")).toHaveValue("");
 	});
 });
 

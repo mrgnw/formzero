@@ -35,7 +35,6 @@ test.describe("signed out", () => {
 	});
 
 	test("/settings/notifications is not served to a signed-out visitor", async ({ request }) => {
-		test.fixme(true, "needs stage 0: loader requires auth");
 		const response = await request.get("/settings/notifications", { maxRedirects: 0 });
 		expect(response.status()).not.toBe(200);
 	});
